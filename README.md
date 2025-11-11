@@ -1,5 +1,11 @@
 # Stock Tracker Agent
 
+
+- [ ] TODO: add tracker for individual people/politicians, what are they trading?
+- [ ] TODO: add tracker/researcher for crypto values
+- [ ] TODO: add speculator for cheap stocks (for fun)
+
+
 An AI-powered agent that tracks selected stock prices, analyzes market news when significant price changes occur, and keeps you informed via automated Telegram messages. You can also interact with the agent by sending Telegram messages to add or remove stocks from your tracker list.
 
 ---
