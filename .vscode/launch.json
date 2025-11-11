@@ -1,0 +1,91 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Main Application",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "justMyCode": true,
+            "django": false
+        },
+        {
+            "name": "Python: Test Mode",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "-test"
+            ],
+            "justMyCode": true,
+            "django": false
+        },
+        {
+            "name": "Python: Research Mode (AAPL)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "-test",
+                "-research",
+                "AAPL"
+            ],
+            "justMyCode": true,
+            "django": false
+        },
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "django": false
+        },
+        {
+            "name": "Python: Pytest",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "${workspaceFolder}/tests",
+                "-v"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "django": false
+        }
+    ]
+}

@@ -1,19 +1,128 @@
-version: '3.8'
+################################################################################
+## Sentry Agent Stack
+##
+################################################################################
+
+####[ NETWORK DEFINITIONS ]#####################################################
+
+networks:
+  agent_net:
+    driver: bridge
+    name: agent_net
+
+####[ PARAMETER DEFINITIONS ]###################################################
+
+# Shared configuration for container logging
+x-logging: &logging-json
+  logging:
+    driver: "json-file" # log to JSON file (default)
+    options:
+      max-file: "10" # allow up to 10 log files per service
+      max-size: "40m" # rotate logs when file size is 40MB
+
+####[ SERVICE DEFINITIONS ]#####################################################
 
 services:
-  content-research-agent:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - OPENAI_API_KEY=sk-proj-12345
-      - TWILIO_PHONE_NUMBER=your_twilio_phone_number
-      - TWILIO_ACCOUNT_SID=your_twilio_account_sid
-      - TWILIO_AUTH_TOKEN=your_twilio_auth_token
-      - TARGET_PHONE_NUMBER=your_personal_phone_number
-      - WEBHOOK_URL=your_twilio_webhook_url
+  agent-stock-sentry:
+    <<: *logging-json
+    command: python src/main.py -test
+    networks: ["agent_net"]
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
     env_file:
       - .env
+    environment:
+      # Override for development
+      - PYTHONPATH=/app/src
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.docker.network=sccsentry_net
+    #   - traefik.http.middlewares.sccsentry.headers.browserXSSFilter=true
+    #   - traefik.http.middlewares.sccsentry.headers.contentTypeNosniff=true
+    #   - traefik.http.middlewares.sccsentry.headers.customFrameOptionsValue=sameorigin
+    #   - traefik.http.middlewares.sccsentry.headers.forceSTSHeader=true
+    #   - traefik.http.middlewares.sccsentry.headers.SSLRedirect=true
+    #   - traefik.http.middlewares.sccsentry.headers.STSIncludeSubdomains=true
+    #   - traefik.http.middlewares.sccsentry.headers.STSPreload=true
+    #   - traefik.http.middlewares.sccsentry.headers.STSSeconds=315360000
+    #   - traefik.http.routers.sccsentry.entrypoints=websecure
+    #   - traefik.http.routers.sccsentry.middlewares=sccsentry@docker
+    #   - traefik.http.routers.sccsentry.rule=Host(`${SCCSENTRY_DOMAIN}`)
+    #   - traefik.http.routers.sccsentry.tls=true
+    #   - traefik.http.services.sccsentry.loadbalancer.server.port=8000
+    #   - traefik.http.services.sccsentry.loadbalancer.server.scheme=http
+    ports:
+      - "8000:8000"
     volumes:
+      # Mount source code for hot reloading
+      - ./src:/app/src:ro
+      - ./resources:/app/resources
       - ./logs:/app/logs
+      # Mount test files
+      - ./tests:/app/tests:ro
+      - ./test_migration.py:/app/test_migration.py:ro
+
+  traefik:
+    <<: *logging-json
+    container_name: macha_traefik
+    image: traefik
+    networks: ["agent_net"]
     restart: unless-stopped
+    command:
+      - "--accesslog=true"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # ACME DNS Challenge Resolver
+      # - "--certificatesresolvers.ledns.acme.caServer=https://acme-v02.api.letsencrypt.org/directory"
+      #- "--certificatesresolvers.ledns.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory"
+      # - "--certificatesresolvers.ledns.acme.dnsChallenge=true"
+      # delayBeforeChecks should be set high enough to allow propagation
+      # - "--certificatesresolvers.ledns.acme.dnsChallenge.propagation.delayBeforeChecks=45"
+      # - "--certificatesresolvers.ledns.acme.dnschallenge.propagation.disableChecks=false"
+      # - "--certificatesresolvers.ledns.acme.dnsChallenge.provider=namecheap"
+      # - "--certificatesresolvers.ledns.acme.dnsChallenge.resolvers=9.9.9.9:53,1.1.1.1:53"
+      # - "--certificatesresolvers.ledns.acme.email=${SSL_EMAIL}"
+      # - "--certificatesresolvers.ledns.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      # - "--entrypoints.web.forwardedHeaders.trustedIps=${REVERSE_PROXY_IPS}"
+      # - "--entrypoints.web.proxyProtocol.trustedIps=${REVERSE_PROXY_IPS}"
+      - "--entrypoints.websecure.address=:443"
+      # - "--entrypoints.websecure.forwardedHeaders.trustedIps=${REVERSE_PROXY_IPS}"
+      # - "--entrypoints.websecure.proxyProtocol.trustedIps=${REVERSE_PROXY_IPS}"
+      - "--global.sendAnonymousUsage=true"
+      - "--global.checkNewVersion=true"
+      - "--log.level=INFO"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--serversTransport.insecureSkipVerify=true"
+      - "--tracing=false"
+    environment:
+      - NAMECHEAP_API_KEY=${NAMECHEAP_API_KEY}
+      - NAMECHEAP_API_USER=${NAMECHEAP_API_USER}
+      - TRAEFIK_GLOBAL_SENDANONYMOUSUSAGE=true
+    ports:
+      - "8080:80"
+      - "8443:443"
+      - "8081:8080"
+    volumes:
+      - "vtrfkssl_dat:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+volumes:
+  vtrfkssl_dat:

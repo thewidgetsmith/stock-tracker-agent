@@ -1,17 +1,105 @@
 version: '3.8'
 
 services:
-  content-research-agent:
-    build: .
+  stock-tracker-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
     ports:
       - "8000:8000"
-    environment:
-      - OPENAI_API_KEY=sk-proj-12345
-      - TWILIO_PHONE_NUMBER=your_twilio_phone_number
-      - TWILIO_ACCOUNT_SID=your_twilio_account_sid
-      - TWILIO_AUTH_TOKEN=your_twilio_auth_token
-      - TARGET_PHONE_NUMBER=your_personal_phone_number
-      - WEBHOOK_URL=your_twilio_webhook_url
     env_file:
       - .env
+    environment:
+      - ENVIRONMENT=production
+      - PYTHONPATH=/app/src
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Only mount data directories in production
+      - ./resources:/app/resources
+      - app-logs:/app/logs
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    networks:
+      - stock-tracker-prod
+    depends_on:
+      redis-prod:
+        condition: service_healthy
+
+  # Redis for production (for caching and session storage)
+  redis-prod:
+    image: redis:7-alpine
+    volumes:
+      - redis-prod-data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.1'
+    networks:
+      - stock-tracker-prod
+
+  # Nginx reverse proxy for production
+  nginx-prod:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - stock-tracker-prod
+    restart: always
+    networks:
+      - stock-tracker-prod
+
+  # Log aggregation for production
+  logrotate:
+    image: blacklabelops/logrotate
+    volumes:
+      - app-logs:/app/logs
+      - nginx-logs:/var/log/nginx
+      - ./docker/logrotate/logrotate.conf:/etc/logrotate.conf:ro
+    restart: always
+
+  # Monitoring with basic health checks
+  healthchecker:
+    image: willfarrell/autoheal
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+    restart: always
+
+volumes:
+  redis-prod-data:
+  app-logs:
+  nginx-logs:
+
+networks:
+  stock-tracker-prod:
+    driver: bridge

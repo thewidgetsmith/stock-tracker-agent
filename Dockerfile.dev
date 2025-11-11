@@ -1,0 +1,109 @@
+# Development-focused Dockerfile for VS Code Dev Containers
+FROM python:3.12-slim-bookworm
+
+# Build argument for conditional dev tool installation
+ARG INSTALL_DEV_TOOLS=true
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    # Basic tools
+    git \
+    curl \
+    wget \
+    vim \
+    nano \
+    htop \
+    tree \
+    # Build tools
+    gcc \
+    g++ \
+    make \
+    # Development tools
+    ssh \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for development
+ARG USERNAME=appuser
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+RUN mkdir -p /etc/sudoers.d/ \
+    && groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel
+
+# Install production dependencies
+RUN pip install -r requirements.txt
+
+# Conditionally install development dependencies
+RUN if [ "$INSTALL_DEV_TOOLS" = "true" ] ; then \
+    pip install \
+    # Testing
+    pytest>=7.4.0 \
+    pytest-asyncio>=0.21.0 \
+    pytest-cov>=4.1.0 \
+    pytest-mock>=3.11.0 \
+    # Code quality
+    black>=23.0.0 \
+    flake8>=6.0.0 \
+    mypy>=1.0.0 \
+    ruff>=0.1.0 \
+    # Development tools
+    ipython>=8.0.0 \
+    ipdb>=0.13.0 \
+    pre-commit>=3.0.0 \
+    # Documentation
+    mkdocs>=1.5.0 \
+    mkdocs-material>=9.0.0 \
+    # Jupyter
+    jupyter>=1.0.0 \
+    jupyterlab>=4.0.0 \
+    ; fi
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/resources /app/logs /app/.cache /app/.venv \
+    && chown -R $USERNAME:$USERNAME /app
+
+# Switch to non-root user
+USER $USERNAME
+
+# Install pre-commit hooks (for the user)
+RUN if [ "$INSTALL_DEV_TOOLS" = "true" ] ; then \
+    git config --global --add safe.directory /app \
+    ; fi
+
+# Set up shell aliases and environment for development
+RUN echo 'alias ll="ls -la"' >> ~/.bashrc \
+    && echo 'alias la="ls -la"' >> ~/.bashrc \
+    && echo 'alias ..="cd .."' >> ~/.bashrc \
+    && echo 'alias ...="cd ../.."' >> ~/.bashrc \
+    && echo 'alias gs="git status"' >> ~/.bashrc \
+    && echo 'alias gd="git diff"' >> ~/.bashrc \
+    && echo 'alias gl="git log --oneline"' >> ~/.bashrc \
+    && echo 'alias pytest="python -m pytest"' >> ~/.bashrc \
+    && echo 'alias test="python src/main.py -test"' >> ~/.bashrc \
+    && echo 'alias run="python src/main.py"' >> ~/.bashrc \
+    && echo 'export PS1="\[\033[36m\]\u@\h\[\033[m\]:\[\033[33m\]\w\[\033[m\]\$ "' >> ~/.bashrc
+
+# Expose the port
+EXPOSE 8000
+
+# Default command for development (keep container running)
+CMD ["sleep", "infinity"]

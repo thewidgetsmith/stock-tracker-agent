@@ -1,0 +1,124 @@
+"""AI agent handlers for message processing and stock research."""
+
+from agents import Agent, Runner, WebSearchTool
+
+from ..comm.telegram import send_telegram_message
+from ..core.tools import (
+    add_stock_to_tracker,
+    get_stock_price_info,
+    get_stock_tracker_list,
+    remove_stock_from_tracker,
+)
+from .prompts import (
+    get_error_message,
+    get_message_handler_config,
+    get_research_pipeline_template,
+    get_stock_research_config,
+    get_summarizer_config,
+)
+
+# Load agent configurations from external prompts
+_message_handler_config = get_message_handler_config()
+_stock_research_config = get_stock_research_config()
+_summarizer_config = get_summarizer_config()
+
+# Message handling agent for processing user commands
+message_handler_agent = Agent(
+    name=_message_handler_config["name"],
+    instructions=_message_handler_config["instructions"],
+    tools=[
+        get_stock_price_info,
+        add_stock_to_tracker,
+        remove_stock_from_tracker,
+        get_stock_tracker_list,
+    ],
+    model=_message_handler_config["model"],
+)
+
+
+# Stock research agent for analyzing price movements
+stock_research_agent = Agent(
+    name=_stock_research_config["name"],
+    instructions=_stock_research_config["instructions"],
+    tools=[get_stock_price_info, WebSearchTool()],
+    model=_stock_research_config["model"],
+)
+
+
+# Summarizer agent for creating concise alerts
+summarizer_agent = Agent(
+    name=_summarizer_config["name"],
+    instructions=_summarizer_config["instructions"],
+    model=_summarizer_config["model"],
+)
+
+
+async def handle_incoming_message(message: str) -> str:
+    """
+    Handle incoming user messages and return appropriate responses.
+
+    Args:
+        message: User message text
+
+    Returns:
+        Response text for the user
+    """
+    print("Processing message:", message)
+
+    try:
+        response = await Runner.run(message_handler_agent, message)
+        return response.final_output
+    except Exception as e:
+        print(f"Error handling message: {e}")
+        return get_error_message("general_error")
+
+
+async def run_research_pipeline(
+    stock_symbol: str, current_price: float, previous_close: float
+) -> str:
+    """
+    Run the research pipeline for a stock that has had significant price movement.
+
+    Args:
+        stock_symbol: Stock ticker symbol
+        current_price: Current stock price
+        previous_close: Previous closing price
+
+    Returns:
+        Final research summary
+    """
+    print(f"Running research pipeline for {stock_symbol}")
+
+    try:
+        # Run stock research
+        response = await Runner.run(stock_research_agent, stock_symbol)
+        print(f"Research pipeline response: {response}")
+
+        # Calculate percentage change
+        change_percent = (current_price / previous_close - 1) * 100
+
+        # Create message for summarizer using template
+        template = get_research_pipeline_template()
+        message_to_summarizer = template.format(
+            stock_symbol=stock_symbol,
+            change_percent=change_percent,
+            research_output=response.final_output,
+        )
+
+        # Generate summary
+        summarizer_response = await Runner.run(summarizer_agent, message_to_summarizer)
+        print(f"Summarizer response: {summarizer_response}")
+
+        final_output = summarizer_response.final_output
+
+        # Send notification via Telegram
+        await send_telegram_message(final_output)
+
+        return final_output
+
+    except Exception as e:
+        print(f"Error in research pipeline: {e}")
+        error_template = get_error_message("research_failed")
+        error_message = error_template.format(stock_symbol=stock_symbol)
+        await send_telegram_message(error_message)
+        return error_message

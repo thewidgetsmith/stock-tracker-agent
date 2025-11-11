@@ -1,0 +1,191 @@
+"""FastAPI application and webhook endpoints."""
+
+import os
+from typing import Any, Dict
+
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from ..agents.handlers import handle_incoming_message
+from ..comm.telegram import telegram_bot
+
+# Security scheme for Bearer token authentication
+security = HTTPBearer()
+
+
+def verify_auth_token(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+) -> str:
+    """
+    Verify the authentication token.
+
+    Args:
+        credentials: The HTTP authorization credentials
+
+    Returns:
+        The token if valid
+
+    Raises:
+        HTTPException: If token is invalid
+    """
+    expected_token = os.getenv("ENDPOINT_AUTH_TOKEN")
+    if not expected_token:
+        raise HTTPException(
+            detail="ENDPOINT_AUTH_TOKEN environment variable not set", status_code=500
+        )
+
+    if credentials.credentials != expected_token:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+    return credentials.credentials
+
+
+def verify_telegram_webhook_auth(request: Request) -> bool:
+    """
+    Verify Telegram webhook authentication using the X-Telegram-Bot-Api-Secret-Token header.
+
+    Args:
+        request: The incoming request
+
+    Returns:
+        True if authenticated, False otherwise
+    """
+    expected_token = os.getenv("TELEGRAM_AUTH_TOKEN")
+    if not expected_token:
+        return False
+
+    secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    return secret_token == expected_token
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="Stock Tracker Agent",
+        description="AI-powered stock monitoring with Telegram notifications",
+        version="1.0.0",
+    )
+
+    # Environment variables
+    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+    @app.get("/")
+    async def root(token: str = Depends(verify_auth_token)):
+        """Health check endpoint."""
+        return {"message": "Stock Tracker Agent is running"}
+
+    @app.get("/health")
+    async def health_check(token: str = Depends(verify_auth_token)):
+        """Health check endpoint."""
+        return {"status": "healthy"}
+
+    @app.post("/webhook/tg-nqlftdvdqi")
+    async def telegram_webhook(request: Request):
+        """
+        Handle incoming Telegram webhook updates.
+
+        This endpoint receives updates from Telegram when users send messages.
+        Uses X-Telegram-Bot-Api-Secret-Token header for authentication.
+        """
+        # Verify Telegram webhook authentication, return 404 if invalid
+        if not verify_telegram_webhook_auth(request):
+            raise HTTPException(status_code=404, detail="Not Found")
+
+        try:
+            update: Dict[str, Any] = await request.json()
+
+            # Extract message information
+            text, chat_id, user_id = telegram_bot.extract_message_info(update)
+
+            if not text or not chat_id:
+                return JSONResponse(content={"status": "ignored"}, status_code=200)
+
+            # Check if message is from authorized user
+            if chat_id != TELEGRAM_CHAT_ID:
+                print(f"Unauthorized message from chat_id: {chat_id}")
+                await telegram_bot.send_message(
+                    "Sorry, you are not authorized to use this bot.", chat_id=chat_id
+                )
+                return JSONResponse(content={"status": "unauthorized"}, status_code=200)
+
+            print(f"Received message from {chat_id}: {text}")
+
+            # Process the message
+            response_text = await handle_incoming_message(text)
+
+            # Send response back to user
+            await telegram_bot.send_message(response_text, chat_id=chat_id)
+
+            return JSONResponse(content={"status": "ok"}, status_code=200)
+
+        except Exception as e:
+            print(f"Error processing webhook: {e}")
+            return JSONResponse(
+                content={"error": "Internal server error"}, status_code=500
+            )
+
+    @app.post("/webhook/set")
+    async def set_webhook(webhook_url: str, token: str = Depends(verify_auth_token)):
+        """
+        Set the Telegram webhook URL.
+
+        Args:
+            webhook_url: The URL where Telegram should send updates
+            token: Authentication token (provided via Authorization header)
+        """
+        try:
+            # Use the same token for webhook secret authentication
+            auth_token = os.getenv("TELEGRAM_AUTH_TOKEN")
+            success = await telegram_bot.set_webhook(
+                webhook_url, secret_token=auth_token
+            )
+            if success:
+                return {
+                    "status": "webhook set successfully",
+                    "url": webhook_url,
+                    "secret_token_configured": bool(auth_token),
+                }
+            else:
+                raise HTTPException(status_code=400, detail="Failed to set webhook")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error setting webhook: {e}")
+
+    @app.get("/webhook/info")
+    async def get_webhook_info(token: str = Depends(verify_auth_token)):
+        """
+        Get current webhook information.
+
+        Args:
+            token: Authentication token (provided via Authorization header)
+        """
+        try:
+            info = await telegram_bot.get_webhook_info()
+            return info
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Error getting webhook info: {e}"
+            )
+
+    @app.delete("/webhook")
+    async def delete_webhook(token: str = Depends(verify_auth_token)):
+        """
+        Delete the current webhook.
+
+        Args:
+            token: Authentication token (provided via Authorization header)
+        """
+        try:
+            success = await telegram_bot.delete_webhook()
+            if success:
+                return {"status": "webhook deleted successfully"}
+            else:
+                raise HTTPException(status_code=400, detail="Failed to delete webhook")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error deleting webhook: {e}")
+
+    return app
+
+
+# Create the app instance
+app = create_app()
