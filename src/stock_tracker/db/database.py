@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 # Database configuration
 DB_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR.mkdir(exist_ok=True)
-DB_PATH = DB_DIR / "stock_tracker.db"
+DB_PATH = DB_DIR / "sentinel.db"
 
 # SQLAlchemy setup
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
@@ -59,6 +59,9 @@ def get_session_sync() -> Session:
 def create_tables():
     """Create all database tables."""
     Base.metadata.create_all(bind=engine)
+
+    # APScheduler will create its tables automatically when first started
+    print("Database tables ensured (APScheduler tables will be created on first use)")
 
 
 def drop_tables():

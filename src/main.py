@@ -10,7 +10,6 @@ import os
 import sys
 
 import uvicorn
-from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -19,9 +18,13 @@ load_dotenv()
 # Import from the new package structure
 from stock_tracker.agents.handlers import handle_incoming_message, run_research_pipeline
 from stock_tracker.core.stock_checker import get_stock_price
-from stock_tracker.core.tracker import track_stocks
+from stock_tracker.scheduler import (
+    add_stock_tracking_job,
+    list_scheduled_jobs,
+    shutdown_scheduler,
+    start_scheduler,
+)
 from stock_tracker.utils.config import ensure_resources_directory, validate_environment
-from stock_tracker.webapi.app import app
 
 
 async def chat_terminal() -> None:
@@ -76,26 +79,27 @@ def main() -> None:
             # Interactive test mode with frequent stock tracking
             print("Starting test mode with 1-minute stock tracking...")
 
-            scheduler = BackgroundScheduler()
-            scheduler.add_job(track_stocks, "interval", minutes=1)
-            scheduler.start()
+            # Start scheduler and add stock tracking job
+            start_scheduler()
+            add_stock_tracking_job(interval_minutes=1)
+            list_scheduled_jobs()
 
             try:
                 asyncio.run(chat_terminal())
             except KeyboardInterrupt:
                 print("\nShutting down...")
             finally:
-                scheduler.shutdown()
+                shutdown_scheduler()
     else:
         # Production mode
         print("Starting Stock Tracker Agent in production mode...")
 
-        minutes = os.getenv("TRACKING_INTERVAL_MINUTES", "60")
+        minutes = int(os.getenv("TRACKING_INTERVAL_MINUTES", "60"))
 
-        # Schedule stock tracking every hour
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(track_stocks, "interval", minutes=int(minutes))
-        scheduler.start()
+        # Start scheduler and add stock tracking job
+        start_scheduler()
+        add_stock_tracking_job(interval_minutes=minutes)
+        list_scheduled_jobs()
 
         # Start the FastAPI server
         try:
@@ -109,7 +113,7 @@ def main() -> None:
         except KeyboardInterrupt:
             print("\nShutting down...")
         finally:
-            scheduler.shutdown()
+            shutdown_scheduler()
 
 
 if __name__ == "__main__":
