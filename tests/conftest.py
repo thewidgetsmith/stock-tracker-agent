@@ -5,36 +5,37 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import AsyncMock, Mock, patch
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 import pytest
 import yaml
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 @pytest.fixture
 def isolated_db():
     """Create an isolated database for testing."""
     # Create a temporary database file
-    temp_fd, temp_path = tempfile.mkstemp(suffix='.db')
-    db_url = f'sqlite:///{temp_path}'
-    
+    temp_fd, temp_path = tempfile.mkstemp(suffix=".db")
+    db_url = f"sqlite:///{temp_path}"
+
     try:
         # Create engine and session for this test
         engine = create_engine(db_url, connect_args={"check_same_thread": False})
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        
+
         # Create tables
         from sentinel.db.models import Base
+
         Base.metadata.create_all(bind=engine)
-        
+
         yield {
-            'engine': engine,
-            'session_factory': SessionLocal,
-            'db_url': db_url,
-            'db_path': temp_path
+            "engine": engine,
+            "session_factory": SessionLocal,
+            "db_url": db_url,
+            "db_path": temp_path,
         }
-        
+
     finally:
         # Cleanup
         try:
@@ -47,10 +48,13 @@ def isolated_db():
 @pytest.fixture
 def mock_db_session(isolated_db):
     """Mock database session to use isolated test database."""
-    with patch('sentinel.db.database.SessionLocal', isolated_db['session_factory']):
-        with patch('sentinel.db.database.engine', isolated_db['engine']):
-            with patch('sentinel.db.database.get_session_sync', lambda: isolated_db['session_factory']()):
-                yield isolated_db['session_factory']()
+    with patch("sentinel.db.database.SessionLocal", isolated_db["session_factory"]):
+        with patch("sentinel.db.database.engine", isolated_db["engine"]):
+            with patch(
+                "sentinel.db.database.get_session_sync",
+                lambda: isolated_db["session_factory"](),
+            ):
+                yield isolated_db["session_factory"]()
 
 
 @pytest.fixture(scope="session")
@@ -177,10 +181,14 @@ def test_yaml_prompts(tmp_path):
 def mock_telegram_env():
     """Mock Telegram environment variables for all tests to prevent real API calls."""
     from unittest.mock import patch
-    with patch.dict("os.environ", {
-        "TELEGRAM_BOT_TOKEN": "test_bot_token_123456",
-        "TELEGRAM_CHAT_ID": "test_chat_id_123456"
-    }):
+
+    with patch.dict(
+        "os.environ",
+        {
+            "TELEGRAM_BOT_TOKEN": "test_bot_token_123456",
+            "TELEGRAM_CHAT_ID": "test_chat_id_123456",
+        },
+    ):
         yield
 
 
@@ -203,26 +211,40 @@ def mock_agents_api_calls():
         mock_response = AsyncMock()
         mock_response.final_output = "Mocked AI response"
         mock_runner.run = AsyncMock(return_value=mock_response)
-        
-        # Mock core tools to prevent real stock API calls
-        with patch("sentinel.core.tools.get_stock_price_info") as mock_stock_info:
-            with patch("sentinel.core.tools.get_tracked_stocks_list") as mock_get_stocks:
-                with patch("sentinel.core.tools.add_stock_to_tracker") as mock_add_stock:
-                    with patch("sentinel.core.tools.remove_stock_from_tracker") as mock_remove_stock:
-                        with patch("sentinel.comm.telegram.send_telegram_message") as mock_telegram:
-                            
+
+        # Mock core agent_tools to prevent real stock API calls
+        with patch("sentinel.core.agent_tools.get_stock_price_info") as mock_stock_info:
+            with patch(
+                "sentinel.core.agent_tools.get_tracked_stocks_list"
+            ) as mock_get_stocks:
+                with patch(
+                    "sentinel.core.agent_tools.add_stock_to_tracker"
+                ) as mock_add_stock:
+                    with patch(
+                        "sentinel.core.agent_tools.remove_stock_from_tracker"
+                    ) as mock_remove_stock:
+                        with patch(
+                            "sentinel.comm.telegram.send_telegram_message"
+                        ) as mock_telegram:
+
                             # Configure default mock returns
-                            mock_stock_info.return_value = {"symbol": "AAPL", "price": 150.0, "change": 2.0}
+                            mock_stock_info.return_value = {
+                                "symbol": "AAPL",
+                                "price": 150.0,
+                                "change": 2.0,
+                            }
                             mock_get_stocks.return_value = ["AAPL", "GOOGL", "MSFT"]
                             mock_add_stock.return_value = "Stock added successfully"
-                            mock_remove_stock.return_value = "Stock removed successfully"
+                            mock_remove_stock.return_value = (
+                                "Stock removed successfully"
+                            )
                             mock_telegram.return_value = None
-                            
+
                             yield {
                                 "runner": mock_runner,
                                 "stock_info": mock_stock_info,
                                 "get_stocks": mock_get_stocks,
                                 "add_stock": mock_add_stock,
                                 "remove_stock": mock_remove_stock,
-                                "telegram": mock_telegram
+                                "telegram": mock_telegram,
                             }
