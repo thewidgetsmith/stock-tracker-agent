@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from stock_tracker.comm.chat_history import ChatHistoryManager
+from sentinel.comm.chat_history import ChatHistoryManager
 
 
 class TestChatHistoryManager:

@@ -19,13 +19,13 @@ class ChatHistoryManager:
         Initialize the chat history manager.
 
         Args:
-            db_path: Path to SQLite database file. Defaults to data/stock_tracker.db
+            db_path: Path to SQLite database file. Defaults to data/sentinel.db
         """
         if db_path is None:
             # Default to data directory
             data_dir = Path(__file__).parent.parent.parent / "data"
             data_dir.mkdir(exist_ok=True)
-            db_path = data_dir / "stock_tracker.db"
+            db_path = data_dir / "sentinel.db"
 
         self.db_path = str(db_path)
         self._init_database()
@@ -135,7 +135,7 @@ class ChatHistoryManager:
             """
             INSERT INTO chat_messages
             (chat_id, message_text, message_type, username, metadata)
-            VALUES (?, ?, 'bot', 'Stock Tracker Bot', ?)
+            VALUES (?, ?, 'bot', 'Sentinel Bot', ?)
         """,
             (chat_id, message_text, json.dumps(metadata) if metadata else None),
         )

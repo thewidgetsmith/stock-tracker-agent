@@ -7,7 +7,7 @@ from ..comm.telegram import send_telegram_message, telegram_bot
 from ..core.tools import (
     add_stock_to_tracker,
     get_stock_price_info,
-    get_stock_tracker_list,
+    get_tracked_stocks_list,
     remove_stock_from_tracker,
 )
 from .prompts import (
@@ -33,7 +33,7 @@ message_handler_agent = Agent(
         get_stock_price_info,
         add_stock_to_tracker,
         remove_stock_from_tracker,
-        get_stock_tracker_list,
+        get_tracked_stocks_list,
     ],
     model=_message_handler_config["model"],
 )

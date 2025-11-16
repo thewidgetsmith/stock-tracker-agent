@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for the stock tracker application."""
+"""SQLAlchemy ORM models for the Sentinel application."""
 
 from datetime import datetime
 from typing import Any, Dict, Optional

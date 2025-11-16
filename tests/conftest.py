@@ -133,7 +133,7 @@ def test_yaml_prompts(tmp_path):
 @pytest.fixture(autouse=True)
 def clean_lru_cache():
     """Clear LRU cache between tests to avoid state pollution."""
-    from src.stock_tracker.agents.prompts import load_agent_prompts
+    from src.sentinel.agents.prompts import load_agent_prompts
 
     yield
 

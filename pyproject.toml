@@ -3,13 +3,13 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stock-tracker-agent"
+name = "sentinel"
 description = "AI-powered stock monitoring with automated notifications"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
-    {name = "Stock Tracker Agent"}
+    {name = "Sentinel"}
 ]
 keywords = ["stock", "tracking", "ai", "telegram", "notifications"]
 classifiers = [
@@ -50,15 +50,15 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/stock-tracker-agent"
-Repository = "https://github.com/yourusername/stock-tracker-agent"
-Issues = "https://github.com/yourusername/stock-tracker-agent/issues"
+Homepage = "https://github.com/yourusername/sentinel"
+Repository = "https://github.com/yourusername/sentinel"
+Issues = "https://github.com/yourusername/sentinel/issues"
 
 [project.scripts]
-stock-tracker = "src.main:main"
+sentinel = "src.main:main"
 
 [tool.setuptools_scm]
-write_to = "src/stock_tracker/_version.py"
+write_to = "src/sentinel/_version.py"
 
 [tool.setuptools.packages.find]
 where = ["src"]

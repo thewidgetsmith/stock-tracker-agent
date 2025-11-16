@@ -63,7 +63,7 @@ def verify_telegram_webhook_auth(request: Request) -> bool:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="Stock Tracker Agent",
+        title="Sentinel",
         description="AI-powered stock monitoring with Telegram notifications",
         version="1.0.0",
     )
@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def root(token: str = Depends(verify_auth_token)):
         """Health check endpoint."""
-        return {"message": "Stock Tracker Agent is running"}
+        return {"message": "Sentinel is running"}
 
     @app.get("/health")
     async def health_check(token: str = Depends(verify_auth_token)):

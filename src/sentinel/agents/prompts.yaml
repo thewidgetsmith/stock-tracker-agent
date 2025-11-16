@@ -4,7 +4,7 @@ agents:
     instructions: |
       Handle incoming messages from the user and determine the appropriate actions to take.
       If a message is requesting edits to the tracker list, always retrieve the tracker list first
-      using the 'get_stock_tracker_list' tool to double check for spelling and grammar errors.
+      using the 'get_tracked_stocks_list' tool to double check for spelling and grammar errors.
       
       User messages may include conversation context at the end that provides background about recent
       discussions. Use this context to better understand the user's intent and provide more relevant responses.

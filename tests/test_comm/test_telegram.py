@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 sys.path.append("src")
-from stock_tracker.comm.telegram import TelegramBot, send_telegram_message
+from sentinel.comm.telegram import TelegramBot, send_telegram_message
 
 
 class TestTelegramBot:
@@ -26,7 +26,7 @@ class TestTelegramBot:
         bot = TelegramBot()
 
         with patch(
-            "stock_tracker.comm.telegram.chat_history_manager"
+            "sentinel.comm.telegram.chat_history_manager"
         ) as mock_history_manager:
             with patch("aiohttp.ClientSession") as mock_session_class:
                 # Create mock session
@@ -57,7 +57,7 @@ class TestTelegramBot:
     async def test_send_message_functionality(self):
         """Test that send_message works correctly."""
         # This tests the global send_telegram_message function
-        with patch("stock_tracker.comm.telegram.telegram_bot") as mock_bot:
+        with patch("sentinel.comm.telegram.telegram_bot") as mock_bot:
             mock_bot.send_message = AsyncMock()
 
             await send_telegram_message("Test message")
@@ -71,14 +71,14 @@ class TestTelegramBotIntegration:
 
     def test_global_telegram_bot_instance_exists(self):
         """Test that the global telegram_bot instance is created."""
-        from stock_tracker.comm.telegram import telegram_bot
+        from sentinel.comm.telegram import telegram_bot
 
         assert telegram_bot is not None
         assert isinstance(telegram_bot, TelegramBot)
 
     def test_get_chat_history_method_still_exists(self):
         """Test that the get_chat_history method still exists (now uses local storage)."""
-        from stock_tracker.comm.telegram import telegram_bot
+        from sentinel.comm.telegram import telegram_bot
 
         # Verify the method exists (now uses ChatHistoryManager internally)
         assert hasattr(telegram_bot, "get_chat_history")
@@ -86,7 +86,7 @@ class TestTelegramBotIntegration:
 
     def test_send_message_method_exists(self):
         """Test that the send_message method exists and is callable."""
-        from stock_tracker.comm.telegram import telegram_bot
+        from sentinel.comm.telegram import telegram_bot
 
         # Verify the method exists
         assert hasattr(telegram_bot, "send_message")

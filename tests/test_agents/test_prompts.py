@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 sys.path.append("src")
-from stock_tracker.agents.prompts import (
+from sentinel.agents.prompts import (
     get_agent_config,
     get_error_message,
     get_message_handler_config,
@@ -23,7 +23,7 @@ from stock_tracker.agents.prompts import (
 
 def test_load_agent_prompts_success(test_yaml_prompts):
     """Test successfully loading agent prompts from YAML file."""
-    with patch("stock_tracker.agents.prompts.Path") as mock_path:
+    with patch("sentinel.agents.prompts.Path") as mock_path:
         mock_path(__file__).parent = test_yaml_prompts.parent
 
         # Clear cache first
@@ -38,7 +38,7 @@ def test_load_agent_prompts_success(test_yaml_prompts):
 
 def test_load_agent_prompts_file_not_found():
     """Test FileNotFoundError when prompts file doesn't exist."""
-    with patch("stock_tracker.agents.prompts.Path") as mock_path:
+    with patch("sentinel.agents.prompts.Path") as mock_path:
         mock_path(__file__).parent = Path("/nonexistent")
 
         # Clear cache first
@@ -54,8 +54,8 @@ def test_load_agent_prompts_invalid_yaml():
     """Test YAMLError when prompts file has invalid YAML."""
     invalid_yaml = "invalid: yaml: content: ["
 
-    with patch("stock_tracker.agents.prompts.open", mock_open(read_data=invalid_yaml)):
-        with patch("stock_tracker.agents.prompts.Path"):
+    with patch("sentinel.agents.prompts.open", mock_open(read_data=invalid_yaml)):
+        with patch("sentinel.agents.prompts.Path"):
             # Clear cache first
             load_agent_prompts.cache_clear()
 
@@ -65,7 +65,7 @@ def test_load_agent_prompts_invalid_yaml():
 
 def test_get_agent_config_success(test_yaml_prompts):
     """Test successfully getting agent configuration."""
-    with patch("stock_tracker.agents.prompts.Path") as mock_path:
+    with patch("sentinel.agents.prompts.Path") as mock_path:
         mock_path(__file__).parent = test_yaml_prompts.parent
 
         # Clear cache first
@@ -80,7 +80,7 @@ def test_get_agent_config_success(test_yaml_prompts):
 
 def test_get_agent_config_not_found(test_yaml_prompts):
     """Test KeyError when agent key doesn't exist."""
-    with patch("stock_tracker.agents.prompts.Path") as mock_path:
+    with patch("sentinel.agents.prompts.Path") as mock_path:
         mock_path(__file__).parent = test_yaml_prompts.parent
 
         # Clear cache first
@@ -95,7 +95,7 @@ def test_get_agent_config_not_found(test_yaml_prompts):
 
 def test_get_template_success(test_yaml_prompts):
     """Test successfully getting template."""
-    with patch("stock_tracker.agents.prompts.Path") as mock_path:
+    with patch("sentinel.agents.prompts.Path") as mock_path:
         mock_path(__file__).parent = test_yaml_prompts.parent
 
         # Clear cache first
@@ -107,7 +107,7 @@ def test_get_template_success(test_yaml_prompts):
 
 def test_get_template_nested_key(test_yaml_prompts):
     """Test getting template with nested key."""
-    with patch("stock_tracker.agents.prompts.Path") as mock_path:
+    with patch("sentinel.agents.prompts.Path") as mock_path:
         mock_path(__file__).parent = test_yaml_prompts.parent
 
         # Clear cache first
@@ -119,7 +119,7 @@ def test_get_template_nested_key(test_yaml_prompts):
 
 def test_get_template_not_found(test_yaml_prompts):
     """Test KeyError when template key doesn't exist."""
-    with patch("stock_tracker.agents.prompts.Path") as mock_path:
+    with patch("sentinel.agents.prompts.Path") as mock_path:
         mock_path(__file__).parent = test_yaml_prompts.parent
 
         # Clear cache first
@@ -141,7 +141,7 @@ def test_get_template_not_found(test_yaml_prompts):
 )
 def test_convenience_config_functions(config_func, expected_agent):
     """Test convenience functions for getting agent configs."""
-    with patch("stock_tracker.agents.prompts.get_agent_config") as mock_get_config:
+    with patch("sentinel.agents.prompts.get_agent_config") as mock_get_config:
         mock_get_config.return_value = {"name": "Test Agent"}
 
         result = config_func()
@@ -159,7 +159,7 @@ def test_convenience_config_functions(config_func, expected_agent):
 )
 def test_get_error_message(error_type, expected_template):
     """Test getting error message templates."""
-    with patch("stock_tracker.agents.prompts.get_template") as mock_get_template:
+    with patch("sentinel.agents.prompts.get_template") as mock_get_template:
         mock_get_template.return_value = "Error message"
 
         result = get_error_message(error_type)
@@ -170,7 +170,7 @@ def test_get_error_message(error_type, expected_template):
 
 def test_get_research_pipeline_template():
     """Test getting research pipeline template."""
-    with patch("stock_tracker.agents.prompts.get_template") as mock_get_template:
+    with patch("sentinel.agents.prompts.get_template") as mock_get_template:
         mock_get_template.return_value = "Pipeline template"
 
         result = get_research_pipeline_template()
@@ -181,8 +181,8 @@ def test_get_research_pipeline_template():
 
 def test_cache_functionality():
     """Test that LRU cache works correctly."""
-    with patch("stock_tracker.agents.prompts.open", mock_open(read_data="agents: {}")):
-        with patch("stock_tracker.agents.prompts.Path"):
+    with patch("sentinel.agents.prompts.open", mock_open(read_data="agents: {}")):
+        with patch("sentinel.agents.prompts.Path"):
             # Clear cache first
             load_agent_prompts.cache_clear()
 

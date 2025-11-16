@@ -8,7 +8,7 @@ import pytest
 from httpx import AsyncClient
 
 sys.path.append("src")
-from stock_tracker.webapi.app import create_app
+from sentinel.webapi.app import create_app
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ async def test_root_endpoint(app):
         response = await ac.get("/")
 
     assert response.status_code == 200
-    assert response.json() == {"message": "Stock Tracker Agent is running"}
+    assert response.json() == {"message": "Sentinel is running"}
 
 
 @pytest.mark.asyncio
@@ -52,7 +52,7 @@ async def test_webhook_info_with_valid_auth(app, test_env_vars, mock_telegram_bo
     """Test webhook info endpoint with valid authentication."""
     headers = {"Authorization": f"Bearer {test_env_vars['TELEGRAM_AUTH_TOKEN']}"}
 
-    with patch("stock_tracker.api.app.telegram_bot", mock_telegram_bot):
+    with patch("sentinel.api.app.telegram_bot", mock_telegram_bot):
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get("/webhook/info", headers=headers)
 
@@ -75,7 +75,7 @@ async def test_set_webhook_with_auth(app, test_env_vars, mock_telegram_bot):
     headers = {"Authorization": f"Bearer {test_env_vars['TELEGRAM_AUTH_TOKEN']}"}
     webhook_url = "https://test.example.com/webhook"
 
-    with patch("stock_tracker.api.app.telegram_bot", mock_telegram_bot):
+    with patch("sentinel.api.app.telegram_bot", mock_telegram_bot):
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.post(
                 f"/webhook/set?webhook_url={webhook_url}", headers=headers
@@ -94,7 +94,7 @@ async def test_delete_webhook_with_auth(app, test_env_vars, mock_telegram_bot):
     """Test deleting webhook with valid authentication."""
     headers = {"Authorization": f"Bearer {test_env_vars['TELEGRAM_AUTH_TOKEN']}"}
 
-    with patch("stock_tracker.api.app.telegram_bot", mock_telegram_bot):
+    with patch("sentinel.api.app.telegram_bot", mock_telegram_bot):
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.delete("/webhook", headers=headers)
 
@@ -135,9 +135,9 @@ async def test_telegram_webhook_with_valid_header(
         }
     }
 
-    with patch("stock_tracker.api.app.telegram_bot", mock_telegram_bot):
+    with patch("sentinel.api.app.telegram_bot", mock_telegram_bot):
         with patch(
-            "stock_tracker.api.app.handle_incoming_message", new_callable=AsyncMock
+            "sentinel.api.app.handle_incoming_message", new_callable=AsyncMock
         ) as mock_handler:
             mock_handler.return_value = "Test response"
 

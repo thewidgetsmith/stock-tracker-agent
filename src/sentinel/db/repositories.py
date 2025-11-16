@@ -58,7 +58,7 @@ class ChatMessageRepository:
             chat_id=chat_id,
             message_text=message_text,
             message_type="bot",
-            username="Stock Tracker Bot",
+            username="Sentinel Bot",
             extra_data=metadata,
         )
 

@@ -9,10 +9,10 @@ from unittest.mock import Mock, mock_open, patch
 import pytest
 
 sys.path.append("src")
-from stock_tracker.core.tools import (
+from sentinel.core.tools import (
     add_stock_to_tracker,
     get_stock_price_info,
-    get_stock_tracker_list,
+    get_tracked_stocks_list,
     remove_stock_from_tracker,
 )
 
@@ -20,7 +20,7 @@ from stock_tracker.core.tools import (
 class TestGetStockPriceInfo:
     """Test the get_stock_price_info function."""
 
-    @patch("stock_tracker.core.tools.get_stock_price")
+    @patch("sentinel.core.tools.get_stock_price")
     def test_successful_stock_price_retrieval(self, mock_get_price):
         """Test successful stock price retrieval."""
         # Setup mock
@@ -37,7 +37,7 @@ class TestGetStockPriceInfo:
         assert "148.0" in result
         mock_get_price.assert_called_once_with("AAPL")
 
-    @patch("stock_tracker.core.tools.get_stock_price")
+    @patch("sentinel.core.tools.get_stock_price")
     def test_stock_price_error_handling(self, mock_get_price):
         """Test error handling when stock price retrieval fails."""
         mock_get_price.side_effect = Exception("API Error")
@@ -48,14 +48,14 @@ class TestGetStockPriceInfo:
         assert "INVALID" in result
 
 
-class TestStockTrackerOperations:
-    """Test stock tracker list operations."""
+class TestTrackerOperations:
+    """Test tracking list operations."""
 
     def test_add_stock_to_tracker_new_file(self, temp_resources_dir):
         """Test adding stock to tracker when file is empty."""
         tracker_file = temp_resources_dir / "tracker_list.json"
 
-        with patch("stock_tracker.core.tools.Path") as mock_path:
+        with patch("sentinel.core.tools.Path") as mock_path:
             mock_path.return_value = tracker_file
 
             result = add_stock_to_tracker("AAPL")
@@ -76,7 +76,7 @@ class TestStockTrackerOperations:
         with open(tracker_file, "w") as f:
             json.dump(["AAPL"], f)
 
-        with patch("stock_tracker.core.tools.Path") as mock_path:
+        with patch("sentinel.core.tools.Path") as mock_path:
             mock_path.return_value = tracker_file
 
             result = add_stock_to_tracker("AAPL")
@@ -92,7 +92,7 @@ class TestStockTrackerOperations:
         with open(tracker_file, "w") as f:
             json.dump(["AAPL", "GOOGL"], f)
 
-        with patch("stock_tracker.core.tools.Path") as mock_path:
+        with patch("sentinel.core.tools.Path") as mock_path:
             mock_path.return_value = tracker_file
 
             result = remove_stock_from_tracker("AAPL")
@@ -110,7 +110,7 @@ class TestStockTrackerOperations:
         """Test removing stock that doesn't exist in tracker."""
         tracker_file = temp_resources_dir / "tracker_list.json"
 
-        with patch("stock_tracker.core.tools.Path") as mock_path:
+        with patch("sentinel.core.tools.Path") as mock_path:
             mock_path.return_value = tracker_file
 
             result = remove_stock_from_tracker("TSLA")
@@ -118,18 +118,18 @@ class TestStockTrackerOperations:
             assert "not found" in result.lower() or "not in" in result.lower()
             assert "TSLA" in result
 
-    def test_get_stock_tracker_list_empty(self, temp_resources_dir):
+    def test_get_tracked_stocks_list_empty(self, temp_resources_dir):
         """Test getting empty tracker list."""
         tracker_file = temp_resources_dir / "tracker_list.json"
 
-        with patch("stock_tracker.core.tools.Path") as mock_path:
+        with patch("sentinel.core.tools.Path") as mock_path:
             mock_path.return_value = tracker_file
 
-            result = get_stock_tracker_list()
+            result = get_tracked_stocks_list()
 
             assert "empty" in result.lower() or "no stocks" in result.lower()
 
-    def test_get_stock_tracker_list_with_stocks(self, temp_resources_dir):
+    def test_get_tracked_stocks_list_with_stocks(self, temp_resources_dir):
         """Test getting tracker list with stocks."""
         tracker_file = temp_resources_dir / "tracker_list.json"
 
@@ -138,10 +138,10 @@ class TestStockTrackerOperations:
         with open(tracker_file, "w") as f:
             json.dump(stocks, f)
 
-        with patch("stock_tracker.core.tools.Path") as mock_path:
+        with patch("sentinel.core.tools.Path") as mock_path:
             mock_path.return_value = tracker_file
 
-            result = get_stock_tracker_list()
+            result = get_tracked_stocks_list()
 
             for stock in stocks:
                 assert stock in result
@@ -151,7 +151,7 @@ class TestStockTrackerOperations:
         """Test that tracker operations create necessary files."""
         tracker_file = tmp_path / "new_tracker.json"
 
-        with patch("stock_tracker.core.tools.Path") as mock_path:
+        with patch("sentinel.core.tools.Path") as mock_path:
             mock_path.return_value = tracker_file
 
             # File doesn't exist yet
@@ -178,7 +178,7 @@ class TestStockTrackerOperations:
 )
 def test_stock_symbols_handling(symbol, expected_in_result):
     """Test handling of different stock symbols."""
-    with patch("stock_tracker.core.tools.get_stock_price") as mock_get_price:
+    with patch("sentinel.core.tools.get_stock_price") as mock_get_price:
         mock_price_data = Mock()
         mock_price_data.current_price = 100.0
         mock_price_data.previous_close = 98.0

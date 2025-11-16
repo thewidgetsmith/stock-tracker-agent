@@ -1,5 +1,5 @@
 """
-Stock Tracker Agent - Main application entry point.
+Sentinel - Main application entry point.
 
 An AI-powered agent that tracks certain stock prices and traders and sends
 Telegram notifications when significant price movements or trades occur.
@@ -16,15 +16,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import from the new package structure
-from stock_tracker.agents.handlers import handle_incoming_message, run_research_pipeline
-from stock_tracker.core.stock_checker import get_stock_price
-from stock_tracker.scheduler import (
+from sentinel.agents.handlers import handle_incoming_message, run_research_pipeline
+from sentinel.core.stock_checker import get_stock_price
+from sentinel.scheduler import (
     add_stock_tracking_job,
     list_scheduled_jobs,
     shutdown_scheduler,
     start_scheduler,
 )
-from stock_tracker.utils.config import ensure_resources_directory, validate_environment
+from sentinel.utils.config import ensure_resources_directory, validate_environment
 
 
 async def chat_terminal() -> None:
@@ -92,7 +92,7 @@ def main() -> None:
                 shutdown_scheduler()
     else:
         # Production mode
-        print("Starting Stock Tracker Agent in production mode...")
+        print("Starting Sentinel in production mode...")
 
         minutes = int(os.getenv("TRACKING_INTERVAL_MINUTES", "60"))
 

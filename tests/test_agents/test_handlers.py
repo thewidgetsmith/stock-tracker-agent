@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 sys.path.append("src")
-from stock_tracker.agents.handlers import (
+from sentinel.agents.handlers import (
     conversation_summarizer_agent,
     handle_incoming_message,
     message_handler_agent,
@@ -55,7 +55,7 @@ class TestHandleIncomingMessage:
         mock_response.final_output = "Successfully processed message"
 
         with patch(
-            "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
         ) as mock_runner:
             mock_runner.return_value = mock_response
 
@@ -68,9 +68,9 @@ class TestHandleIncomingMessage:
     async def test_error_handling(self):
         """Test error handling in message processing."""
         with patch(
-            "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
         ) as mock_runner:
-            with patch("stock_tracker.agents.handlers.get_error_message") as mock_error:
+            with patch("sentinel.agents.handlers.get_error_message") as mock_error:
                 mock_runner.side_effect = Exception("Test error")
                 mock_error.return_value = "Error occurred"
 
@@ -86,7 +86,7 @@ class TestHandleIncomingMessage:
         mock_response.final_output = "Test response"
 
         with patch(
-            "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
         ) as mock_runner:
             mock_runner.return_value = mock_response
 
@@ -110,14 +110,14 @@ class TestRunResearchPipeline:
         mock_summarizer_response.final_output = "AAPL UP 2.50%: earnings beat"
 
         with patch(
-            "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
         ) as mock_runner:
             with patch(
-                "stock_tracker.agents.handlers.send_telegram_message",
+                "sentinel.agents.handlers.send_telegram_message",
                 new_callable=AsyncMock,
             ) as mock_telegram:
                 with patch(
-                    "stock_tracker.agents.handlers.get_research_pipeline_template"
+                    "sentinel.agents.handlers.get_research_pipeline_template"
                 ) as mock_template:
                     # Setup mocks
                     mock_runner.side_effect = [
@@ -146,14 +146,14 @@ class TestRunResearchPipeline:
         mock_summarizer_response.final_output = "Test summary"
 
         with patch(
-            "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
         ) as mock_runner:
             with patch(
-                "stock_tracker.agents.handlers.send_telegram_message",
+                "sentinel.agents.handlers.send_telegram_message",
                 new_callable=AsyncMock,
             ):
                 with patch(
-                    "stock_tracker.agents.handlers.get_research_pipeline_template"
+                    "sentinel.agents.handlers.get_research_pipeline_template"
                 ) as mock_template:
                     mock_runner.side_effect = [
                         mock_research_response,
@@ -175,14 +175,14 @@ class TestRunResearchPipeline:
     async def test_research_pipeline_error_handling(self):
         """Test error handling in research pipeline."""
         with patch(
-            "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
         ) as mock_runner:
             with patch(
-                "stock_tracker.agents.handlers.send_telegram_message",
+                "sentinel.agents.handlers.send_telegram_message",
                 new_callable=AsyncMock,
             ) as mock_telegram:
                 with patch(
-                    "stock_tracker.agents.handlers.get_error_message"
+                    "sentinel.agents.handlers.get_error_message"
                 ) as mock_error:
                     # Setup error scenario
                     mock_runner.side_effect = Exception("Research failed")
@@ -206,14 +206,14 @@ class TestRunResearchPipeline:
         mock_response.final_output = "Test"
 
         with patch(
-            "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
         ) as mock_runner:
             with patch(
-                "stock_tracker.agents.handlers.send_telegram_message",
+                "sentinel.agents.handlers.send_telegram_message",
                 new_callable=AsyncMock,
             ):
                 with patch(
-                    "stock_tracker.agents.handlers.get_research_pipeline_template"
+                    "sentinel.agents.handlers.get_research_pipeline_template"
                 ):
                     mock_runner.return_value = mock_response
 
@@ -242,14 +242,14 @@ async def test_percentage_calculations(current_price, previous_close, expected_c
     mock_summarizer_response.final_output = "Test"
 
     with patch(
-        "stock_tracker.agents.handlers.Runner.run", new_callable=AsyncMock
+        "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
     ) as mock_runner:
         with patch(
-            "stock_tracker.agents.handlers.send_telegram_message",
+            "sentinel.agents.handlers.send_telegram_message",
             new_callable=AsyncMock,
         ):
             with patch(
-                "stock_tracker.agents.handlers.get_research_pipeline_template"
+                "sentinel.agents.handlers.get_research_pipeline_template"
             ) as mock_template:
                 mock_runner.side_effect = [
                     mock_research_response,
@@ -275,7 +275,7 @@ class TestConversationHistory:
         """Test that conversation history is fetched and used when chat_id is provided."""
         # Mock the conversation summary from chat history manager
         with patch(
-            "stock_tracker.agents.handlers.chat_history_manager"
+            "sentinel.agents.handlers.chat_history_manager"
         ) as mock_history_manager:
             mock_history_manager.get_conversation_summary.return_value = (
                 "User: What's the price of AAPL?\n"
@@ -283,7 +283,7 @@ class TestConversationHistory:
             )
 
             # Mock the Runner.run method for both agents
-            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+            with patch("sentinel.agents.handlers.Runner") as mock_runner:
                 # Mock response for conversation summarizer
                 mock_summarizer_response = AsyncMock()
                 mock_summarizer_response.final_output = (
@@ -331,7 +331,7 @@ class TestConversationHistory:
     @pytest.mark.asyncio
     async def test_handle_message_without_chat_id(self):
         """Test that function works normally when no chat_id is provided."""
-        with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+        with patch("sentinel.agents.handlers.Runner") as mock_runner:
             mock_response = AsyncMock()
             mock_response.final_output = "I can help you with stock information."
             mock_runner.run = AsyncMock(return_value=mock_response)
@@ -353,14 +353,14 @@ class TestConversationHistory:
     async def test_handle_message_with_empty_chat_history(self):
         """Test handling when chat history is empty."""
         with patch(
-            "stock_tracker.agents.handlers.chat_history_manager"
+            "sentinel.agents.handlers.chat_history_manager"
         ) as mock_history_manager:
             # Return the default "no history" message
             mock_history_manager.get_conversation_summary.return_value = (
                 "No previous conversation history."
             )
 
-            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+            with patch("sentinel.agents.handlers.Runner") as mock_runner:
                 mock_response = AsyncMock()
                 mock_response.final_output = "How can I help you?"
                 mock_runner.run = AsyncMock(return_value=mock_response)
@@ -379,13 +379,13 @@ class TestConversationHistory:
     @pytest.mark.asyncio
     async def test_handle_message_with_chat_history_error(self):
         """Test handling when chat history fetch fails."""
-        with patch("stock_tracker.agents.handlers.telegram_bot") as mock_telegram_bot:
+        with patch("sentinel.agents.handlers.telegram_bot") as mock_telegram_bot:
             # Simulate error in get_chat_history
             mock_telegram_bot.get_chat_history = AsyncMock(
                 side_effect=Exception("API Error")
             )
 
-            with patch("stock_tracker.agents.handlers.get_error_message") as mock_error:
+            with patch("sentinel.agents.handlers.get_error_message") as mock_error:
                 mock_error.return_value = (
                     "Sorry, there was an error processing your request."
                 )
@@ -416,14 +416,14 @@ class TestConversationHistory:
             },
         ]
 
-        with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+        with patch("sentinel.agents.handlers.Runner") as mock_runner:
             mock_response = AsyncMock()
             mock_response.final_output = "User asked about TSLA and wants to track MSFT"
             mock_runner.run = AsyncMock(return_value=mock_response)
 
             # Test that the agent receives the properly formatted history
             with patch(
-                "stock_tracker.agents.handlers.telegram_bot"
+                "sentinel.agents.handlers.telegram_bot"
             ) as mock_telegram_bot:
                 mock_telegram_bot.get_chat_history = AsyncMock(
                     return_value=mock_chat_history
@@ -454,12 +454,12 @@ class TestConversationHistory:
             }
         ]
 
-        with patch("stock_tracker.agents.handlers.telegram_bot") as mock_telegram_bot:
+        with patch("sentinel.agents.handlers.telegram_bot") as mock_telegram_bot:
             mock_telegram_bot.get_chat_history = AsyncMock(
                 return_value=mock_chat_history
             )
 
-            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+            with patch("sentinel.agents.handlers.Runner") as mock_runner:
                 # Mock conversation summarizer response
                 mock_summarizer_response = AsyncMock()
                 mock_summarizer_response.final_output = (
@@ -511,12 +511,12 @@ class TestConversationHistory:
             },
         ]
 
-        with patch("stock_tracker.agents.handlers.telegram_bot") as mock_telegram_bot:
+        with patch("sentinel.agents.handlers.telegram_bot") as mock_telegram_bot:
             mock_telegram_bot.get_chat_history = AsyncMock(
                 return_value=mock_chat_history
             )
 
-            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+            with patch("sentinel.agents.handlers.Runner") as mock_runner:
                 mock_summarizer_response = AsyncMock()
                 mock_summarizer_response.final_output = "Discussion about AAPL earnings"
 

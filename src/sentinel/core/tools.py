@@ -32,7 +32,7 @@ async def remove_stock_from_tracker(symbol: str) -> str:
 
 
 @function_tool
-async def get_stock_tracker_list() -> List[str]:
+async def get_tracked_stocks_list() -> List[str]:
     """Get the current list of tracked stocks."""
     with TrackedStockRepository() as repo:
         symbols = repo.get_stock_symbols()
