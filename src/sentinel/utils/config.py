@@ -6,47 +6,84 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-REQUIRED_VARS = [
-    "TELEGRAM_AUTH_TOKEN",
-    "TELEGRAM_BOT_TOKEN",
-    "TELEGRAM_CHAT_ID",
-    "OPENAI_API_KEY",
-]
+from ..config.logging import get_logger, setup_logging
+
+# Import new configuration system
+from ..config.settings import (
+    get_required_env_vars,
+    get_settings,
+    validate_required_settings,
+)
+
+# For backward compatibility
+REQUIRED_VARS = get_required_env_vars()
 
 
 def ensure_resources_directory() -> None:
     """Ensure the resources directory and database are initialized."""
-    from pathlib import Path
+    logger = get_logger(__name__)
 
-    resources_path = Path("data")
+    # Get settings to use configured data directory
+    settings = get_settings()
+    resources_path = Path(settings.data_directory)
     resources_path.mkdir(exist_ok=True)
+
+    logger.info("Ensured data directory exists", path=str(resources_path))
 
     # Initialize database tables
     from ..db.database import create_tables
 
     create_tables()
-    print("Ensured database tables exist")
+    logger.info("Ensured database tables exist")
+
+
+def initialize_application() -> None:
+    """Initialize application configuration and logging."""
+    # Get settings (this will load from environment)
+    settings = get_settings()
+
+    # Setup logging with configured settings
+    setup_logging(
+        level=settings.log_level,
+        format_type=settings.log_format,
+        file_enabled=settings.log_file_enabled,
+        file_path=settings.log_file_path,
+        max_file_size=settings.log_max_file_size,
+        backup_count=settings.log_backup_count,
+    )
+
+    # Initialize resources
+    ensure_resources_directory()
+
+    logger = get_logger(__name__)
+    logger.info(
+        "Application initialized successfully",
+        environment=settings.environment,
+        debug=settings.debug,
+        data_dir=settings.data_directory,
+    )
 
 
 def load_config() -> Dict[str, Any]:
-    """Load and validate configuration from environment variables."""
-    config = {
-        "telegram_bot_token": os.getenv("TELEGRAM_BOT_TOKEN"),
-        "telegram_chat_id": os.getenv("TELEGRAM_CHAT_ID"),
-        "openai_api_key": os.getenv("OPENAI_API_KEY"),
-        "webhook_url": os.getenv("WEBHOOK_URL"),
-        "host": os.getenv("ENDPOINT_HOST", "0.0.0.0"),
-        "port": int(os.getenv("ENDPOINT_PORT", "8000")),
+    """
+    Load and validate configuration from environment variables.
+
+    DEPRECATED: Use get_settings() instead.
+    This function is kept for backward compatibility.
+    """
+    logger = get_logger(__name__)
+    logger.warning("load_config() is deprecated, use get_settings() instead")
+
+    settings = get_settings()
+
+    return {
+        "telegram_bot_token": settings.telegram_bot_token,
+        "telegram_chat_id": settings.telegram_chat_id,
+        "openai_api_key": settings.openai_api_key,
+        "webhook_url": settings.telegram_webhook_url,
+        "host": settings.endpoint_host,
+        "port": settings.endpoint_port,
     }
-
-    # Validate required config
-    required_keys = ["telegram_bot_token", "telegram_chat_id", "openai_api_key"]
-    missing_keys = [key for key in required_keys if not config[key]]
-
-    if missing_keys:
-        raise ValueError(f"Missing required environment variables: {missing_keys}")
-
-    return config
 
 
 def validate_environment() -> bool:
@@ -56,14 +93,4 @@ def validate_environment() -> bool:
     Returns:
         True if all required variables are set, False otherwise
     """
-
-    missing_vars = []
-    for var in REQUIRED_VARS:
-        if not os.getenv(var):
-            missing_vars.append(var)
-
-    if missing_vars:
-        print(f"Missing required environment variables: {missing_vars}")
-        return False
-
-    return True
+    return validate_required_settings()

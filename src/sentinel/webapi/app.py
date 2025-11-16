@@ -10,6 +10,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from ..agents.handlers import handle_incoming_message
 from ..comm.chat_history import chat_history_manager
 from ..comm.telegram import telegram_bot
+from ..config.logging import get_logger
+from ..config.settings import get_settings
+
+# Get settings and logger
+settings = get_settings()
+logger = get_logger(__name__)
 
 # Security scheme for Bearer token authentication
 security = HTTPBearer()
@@ -30,15 +36,21 @@ def verify_auth_token(
     Raises:
         HTTPException: If token is invalid
     """
-    expected_token = os.getenv("ENDPOINT_AUTH_TOKEN")
+    expected_token = settings.endpoint_auth_token
     if not expected_token:
+        logger.error("Endpoint auth token not configured")
         raise HTTPException(
-            detail="ENDPOINT_AUTH_TOKEN environment variable not set", status_code=500
+            detail="ENDPOINT_AUTH_TOKEN not configured", status_code=500
         )
 
     if credentials.credentials != expected_token:
+        logger.warning(
+            "Invalid authentication attempt",
+            provided_token_length=len(credentials.credentials),
+        )
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
+    logger.debug("Authentication successful")
     return credentials.credentials
 
 
@@ -52,12 +64,23 @@ def verify_telegram_webhook_auth(request: Request) -> bool:
     Returns:
         True if authenticated, False otherwise
     """
-    expected_token = os.getenv("TELEGRAM_AUTH_TOKEN")
+    expected_token = settings.telegram_auth_token
     if not expected_token:
+        logger.error("Telegram auth token not configured")
         return False
 
     secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-    return secret_token == expected_token
+    if not secret_token:
+        logger.warning("Missing Telegram webhook secret header")
+        return False
+
+    is_valid = secret_token == expected_token
+    if not is_valid:
+        logger.warning("Invalid Telegram webhook authentication")
+    else:
+        logger.debug("Telegram webhook authentication successful")
+
+    return is_valid
 
 
 def create_app() -> FastAPI:
@@ -68,17 +91,16 @@ def create_app() -> FastAPI:
         version="1.0.0",
     )
 
-    # Environment variables
-    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
     @app.get("/")
     async def root(token: str = Depends(verify_auth_token)):
         """Health check endpoint."""
+        logger.info("Health check endpoint accessed")
         return {"message": "Sentinel is running"}
 
     @app.get("/health")
     async def health_check(token: str = Depends(verify_auth_token)):
         """Health check endpoint."""
+        logger.info("Health status endpoint accessed")
         return {"status": "healthy"}
 
     @app.post("/webhook/tg-nqlftdvdqi")
@@ -103,8 +125,12 @@ def create_app() -> FastAPI:
                 return JSONResponse(content={"status": "ignored"}, status_code=200)
 
             # Check if message is from authorized user
-            if chat_id != TELEGRAM_CHAT_ID:
-                print(f"Unauthorized message from chat_id: {chat_id}")
+            if chat_id != settings.telegram_chat_id:
+                logger.warning(
+                    "Unauthorized message attempt",
+                    received_chat_id=chat_id,
+                    authorized_chat_id=settings.telegram_chat_id,
+                )
                 await telegram_bot.send_message(
                     "Sorry, you are not authorized to use this bot.", chat_id=chat_id
                 )

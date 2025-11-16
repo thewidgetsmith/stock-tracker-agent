@@ -12,11 +12,15 @@ import sys
 import uvicorn
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables first
 load_dotenv()
 
 # Import from the new package structure
 from sentinel.agents.handlers import handle_incoming_message, run_research_pipeline
+from sentinel.config.logging import get_logger
+
+# Import configuration system
+from sentinel.config.settings import get_settings
 from sentinel.core.stock_checker import get_stock_price
 from sentinel.scheduler import (
     add_stock_tracking_job,
@@ -24,44 +28,69 @@ from sentinel.scheduler import (
     shutdown_scheduler,
     start_scheduler,
 )
-from sentinel.utils.config import ensure_resources_directory, validate_environment
+from sentinel.utils.config import initialize_application, validate_environment
 
 
 async def chat_terminal() -> None:
     """Interactive chat mode for testing purposes."""
+    logger = get_logger(__name__)
+    logger.info("Starting interactive chat mode")
+
     print("Chat mode activated. Type 'exit' to quit.")
     while True:
         user_input = input("You: ")
         if user_input.lower() == "exit":
             print("Exiting chat.")
+            logger.info("Chat mode ended by user")
             break
         try:
+            logger.debug("Processing user input", input=user_input)
             response = await handle_incoming_message(user_input)
             print(f"Bot: {response}")
+            logger.debug("Response sent", response=response)
         except Exception as e:
+            print(f"Error: {e}")
+            logger.error("Error in chat terminal", error=str(e), exc_info=True)
             print(f"Error: {e}")
 
 
 def main() -> None:
     """Main application entry point."""
-    # Ensure required directories and files exist
-    ensure_resources_directory()
+    # Initialize application (logging, config, resources)
+    initialize_application()
+
+    # Get logger after initialization
+    logger = get_logger(__name__)
+    logger.info("Starting Sentinel application")
+
+    # Get settings
+    settings = get_settings()
 
     # Validate environment
     if not validate_environment():
+        logger.error("Environment validation failed")
         print(
             "Please set the required environment variables before running the application."
         )
-        print(
-            "Required variables: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, OPENAI_API_KEY"
-        )
+        required_vars = [
+            "TELEGRAM_BOT_TOKEN",
+            "TELEGRAM_CHAT_ID",
+            "TELEGRAM_AUTH_TOKEN",
+            "OPENAI_API_KEY",
+            "ENDPOINT_AUTH_TOKEN",
+        ]
+        print(f"Required variables: {', '.join(required_vars)}")
         sys.exit(1)
+
+    logger.info("Environment validation passed")
 
     if "-test" in sys.argv:
         if "-research" in sys.argv:
             # Research mode for testing specific stock
+            logger.info("Starting research mode")
             try:
                 stock_symbol = sys.argv[sys.argv.index("-research") + 1]
+                logger.info("Running research pipeline", symbol=stock_symbol)
                 stock_price = get_stock_price(stock_symbol)
                 asyncio.run(
                     run_research_pipeline(
@@ -71,12 +100,14 @@ def main() -> None:
                     )
                 )
             except (IndexError, ValueError) as e:
+                logger.error("Invalid research command", error=str(e))
                 print(
                     f"Error: Please provide a valid stock symbol after -research flag. {e}"
                 )
                 sys.exit(1)
         else:
             # Interactive test mode with frequent stock tracking
+            logger.info("Starting test mode", interval_minutes=1)
             print("Starting test mode with 1-minute stock tracking...")
 
             # Start scheduler and add stock tracking job
@@ -87,32 +118,40 @@ def main() -> None:
             try:
                 asyncio.run(chat_terminal())
             except KeyboardInterrupt:
+                logger.info("Received interrupt signal")
                 print("\nShutting down...")
             finally:
+                logger.info("Shutting down scheduler")
                 shutdown_scheduler()
     else:
         # Production mode
+        logger.info(
+            "Starting production mode",
+            interval_minutes=settings.tracking_interval_minutes,
+            host=settings.endpoint_host,
+            port=settings.endpoint_port,
+        )
         print("Starting Sentinel in production mode...")
-
-        minutes = int(os.getenv("TRACKING_INTERVAL_MINUTES", "60"))
 
         # Start scheduler and add stock tracking job
         start_scheduler()
-        add_stock_tracking_job(interval_minutes=minutes)
+        add_stock_tracking_job(interval_minutes=settings.tracking_interval_minutes)
         list_scheduled_jobs()
 
         # Start the FastAPI server
         try:
             uvicorn.run(
                 "main:app",
-                host=os.getenv("ENDPOINT_HOST", "0.0.0.0"),
-                port=int(os.getenv("ENDPOINT_PORT", "8080")),
-                reload=False,  # Disable reload in production
-                log_level="info",
+                host=settings.endpoint_host,
+                port=settings.endpoint_port,
+                reload=settings.api_reload,  # Use configured reload setting
+                log_level=settings.api_log_level.lower(),
             )
         except KeyboardInterrupt:
+            logger.info("Received interrupt signal")
             print("\nShutting down...")
         finally:
+            logger.info("Shutting down scheduler")
             shutdown_scheduler()
 
 

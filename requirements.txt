@@ -8,11 +8,15 @@ aiohttp>=3.9.0
 # Environment and configuration
 python-dotenv>=1.0.0
 pydantic>=2.5.0
+pydantic-settings>=2.0.0
 pyyaml>=6.0
 
 # Database ORM
 sqlalchemy>=2.0.0
 alembic>=1.12.0
+
+# Structured logging
+structlog>=23.0.0
 
 # AI and agents
 openai>=1.3.0
