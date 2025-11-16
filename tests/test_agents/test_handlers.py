@@ -379,11 +379,9 @@ class TestConversationHistory:
     @pytest.mark.asyncio
     async def test_handle_message_with_chat_history_error(self):
         """Test handling when chat history fetch fails."""
-        with patch("sentinel.agents.handlers.telegram_bot") as mock_telegram_bot:
-            # Simulate error in get_chat_history
-            mock_telegram_bot.get_chat_history = AsyncMock(
-                side_effect=Exception("API Error")
-            )
+        with patch("sentinel.agents.handlers.chat_history_manager") as mock_history_manager:
+            # Simulate error in get_conversation_summary
+            mock_history_manager.get_conversation_summary.side_effect = Exception("Database Error")
 
             with patch("sentinel.agents.handlers.get_error_message") as mock_error:
                 mock_error.return_value = (
@@ -401,46 +399,51 @@ class TestConversationHistory:
     @pytest.mark.asyncio
     async def test_conversation_summarizer_agent_functionality(self):
         """Test the conversation summarizer agent directly."""
-        mock_chat_history = [
-            {
-                "message_id": 1,
-                "text": "What's TSLA doing today?",
-                "from": {"first_name": "Alice"},
-                "date": 1640000000,
-            },
-            {
-                "message_id": 2,
-                "text": "Add MSFT to my watchlist",
-                "from": {"first_name": "Alice"},
-                "date": 1640000100,
-            },
-        ]
+        mock_conversation_summary = (
+            "User: What's TSLA doing today?\n"
+            "Bot: TSLA is currently trading at $220.50\n"
+            "User: Add MSFT to my watchlist"
+        )
 
-        with patch("sentinel.agents.handlers.Runner") as mock_runner:
-            mock_response = AsyncMock()
-            mock_response.final_output = "User asked about TSLA and wants to track MSFT"
-            mock_runner.run = AsyncMock(return_value=mock_response)
+        with patch("sentinel.agents.handlers.chat_history_manager") as mock_history_manager:
+            mock_history_manager.get_conversation_summary.return_value = mock_conversation_summary
 
-            # Test that the agent receives the properly formatted history
-            with patch(
-                "sentinel.agents.handlers.telegram_bot"
-            ) as mock_telegram_bot:
-                mock_telegram_bot.get_chat_history = AsyncMock(
-                    return_value=mock_chat_history
-                )
+            with patch("sentinel.agents.handlers.Runner") as mock_runner:
+                mock_summarizer_response = AsyncMock()
+                mock_summarizer_response.final_output = "User asked about TSLA and wants to track MSFT"
 
-                await handle_incoming_message("Show my portfolio", chat_id="test_chat")
+                mock_handler_response = AsyncMock()
+                mock_handler_response.final_output = "I'll help you track these stocks"
 
-                # Check that the conversation summarizer was called with the history
-                summarizer_call = mock_runner.run.call_args_list[0]
-                summarizer_agent_used = summarizer_call[0][0]
-                history_message = summarizer_call[0][1]
+                def mock_run(agent, message):
+                    if "Conversation History Summarizer" in str(agent.name):
+                        # Verify conversation summary is passed correctly
+                        assert "Recent conversation history:" in message
+                        assert "What's TSLA doing today?" in message
+                        assert "Add MSFT to my watchlist" in message
+                        return mock_summarizer_response
+                    else:
+                        return mock_handler_response
 
-                assert "Conversation History Summarizer" in summarizer_agent_used.name
-                # The actual format includes the full JSON representation
-                assert "Recent conversation history:" in history_message
-                assert "What's TSLA doing today?" in history_message
-                assert "Add MSFT to my watchlist" in history_message
+                mock_runner.run = AsyncMock(side_effect=mock_run)
+
+                result = await handle_incoming_message("Show my portfolio", chat_id="test_chat")
+
+                # Verify that get_conversation_summary was called
+                mock_history_manager.get_conversation_summary.assert_called_once_with("test_chat", limit=5)
+
+                # Check that Runner.run was called twice (summarizer + handler)
+                assert mock_runner.run.call_count == 2
+
+                # Check the final result
+                assert result == "I'll help you track these stocks"
+
+                # Verify the conversation context was included in the message handler call
+                handler_call_args = mock_runner.run.call_args_list[1][0]
+                full_message = handler_call_args[1]
+                assert "Show my portfolio" in full_message
+                assert "Conversation Context:" in full_message
+                assert "User asked about TSLA and wants to track MSFT" in full_message
 
     @pytest.mark.asyncio
     async def test_message_handler_receives_enhanced_context(self):
@@ -496,25 +499,14 @@ class TestConversationHistory:
     @pytest.mark.asyncio
     async def test_conversation_history_with_multiple_users(self):
         """Test conversation history handling with multiple users in chat."""
-        mock_chat_history = [
-            {
-                "message_id": 1,
-                "text": "AAPL earnings today",
-                "from": {"first_name": "Alice"},
-                "date": 1640000000,
-            },
-            {
-                "message_id": 2,
-                "text": "Good luck!",
-                "from": {"first_name": "Bob"},
-                "date": 1640000100,
-            },
-        ]
+        mock_conversation_summary = (
+            "User: AAPL earnings today (Alice)\n"
+            "Bot: AAPL will report earnings after market close\n"
+            "User: Good luck! (Bob)"
+        )
 
-        with patch("sentinel.agents.handlers.telegram_bot") as mock_telegram_bot:
-            mock_telegram_bot.get_chat_history = AsyncMock(
-                return_value=mock_chat_history
-            )
+        with patch("sentinel.agents.handlers.chat_history_manager") as mock_history_manager:
+            mock_history_manager.get_conversation_summary.return_value = mock_conversation_summary
 
             with patch("sentinel.agents.handlers.Runner") as mock_runner:
                 mock_summarizer_response = AsyncMock()
@@ -536,6 +528,8 @@ class TestConversationHistory:
 
                 mock_runner.run = AsyncMock(side_effect=mock_run)
 
-                await handle_incoming_message("How did AAPL do?", chat_id="group_chat")
+                result = await handle_incoming_message("How did AAPL do?", chat_id="group_chat")
 
+                # Should call both summarizer and handler
                 assert mock_runner.run.call_count == 2
+                assert result == "AAPL earnings were strong"

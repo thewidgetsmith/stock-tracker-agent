@@ -193,3 +193,36 @@ def clean_lru_cache():
 
     # Clear the cache after each test
     load_agent_prompts.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def mock_agents_api_calls():
+    """Mock all external API calls in agents module to prevent real calls during tests."""
+    with patch("sentinel.agents.handlers.Runner") as mock_runner:
+        # Default mock response for all Runner.run calls
+        mock_response = AsyncMock()
+        mock_response.final_output = "Mocked AI response"
+        mock_runner.run = AsyncMock(return_value=mock_response)
+        
+        # Mock core tools to prevent real stock API calls
+        with patch("sentinel.core.tools.get_stock_price_info") as mock_stock_info:
+            with patch("sentinel.core.tools.get_tracked_stocks_list") as mock_get_stocks:
+                with patch("sentinel.core.tools.add_stock_to_tracker") as mock_add_stock:
+                    with patch("sentinel.core.tools.remove_stock_from_tracker") as mock_remove_stock:
+                        with patch("sentinel.comm.telegram.send_telegram_message") as mock_telegram:
+                            
+                            # Configure default mock returns
+                            mock_stock_info.return_value = {"symbol": "AAPL", "price": 150.0, "change": 2.0}
+                            mock_get_stocks.return_value = ["AAPL", "GOOGL", "MSFT"]
+                            mock_add_stock.return_value = "Stock added successfully"
+                            mock_remove_stock.return_value = "Stock removed successfully"
+                            mock_telegram.return_value = None
+                            
+                            yield {
+                                "runner": mock_runner,
+                                "stock_info": mock_stock_info,
+                                "get_stocks": mock_get_stocks,
+                                "add_stock": mock_add_stock,
+                                "remove_stock": mock_remove_stock,
+                                "telegram": mock_telegram
+                            }
