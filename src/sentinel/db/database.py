@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Generator
 
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 # Database configuration
 DB_DIR = Path(__file__).parent.parent.parent.parent / "data"

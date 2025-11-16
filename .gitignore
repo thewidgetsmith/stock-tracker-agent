@@ -8,6 +8,12 @@ __pycache__
 .coverage.*
 htmlcov/
 
+# Python build artifacts
+build/
+dist/
+_version.py
+*.egg-info/
+
 # Ignore virtual environment directories
 .venv
 venv

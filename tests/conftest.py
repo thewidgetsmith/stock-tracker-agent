@@ -4,10 +4,53 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 import pytest
 import yaml
+
+
+@pytest.fixture
+def isolated_db():
+    """Create an isolated database for testing."""
+    # Create a temporary database file
+    temp_fd, temp_path = tempfile.mkstemp(suffix='.db')
+    db_url = f'sqlite:///{temp_path}'
+    
+    try:
+        # Create engine and session for this test
+        engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        
+        # Create tables
+        from sentinel.db.models import Base
+        Base.metadata.create_all(bind=engine)
+        
+        yield {
+            'engine': engine,
+            'session_factory': SessionLocal,
+            'db_url': db_url,
+            'db_path': temp_path
+        }
+        
+    finally:
+        # Cleanup
+        try:
+            os.close(temp_fd)
+            os.unlink(temp_path)
+        except:
+            pass
+
+
+@pytest.fixture
+def mock_db_session(isolated_db):
+    """Mock database session to use isolated test database."""
+    with patch('sentinel.db.database.SessionLocal', isolated_db['session_factory']):
+        with patch('sentinel.db.database.engine', isolated_db['engine']):
+            with patch('sentinel.db.database.get_session_sync', lambda: isolated_db['session_factory']()):
+                yield isolated_db['session_factory']()
 
 
 @pytest.fixture(scope="session")
@@ -128,6 +171,17 @@ def test_yaml_prompts(tmp_path):
         yaml.dump(prompts_data, f)
 
     return yaml_file
+
+
+@pytest.fixture(autouse=True)
+def mock_telegram_env():
+    """Mock Telegram environment variables for all tests to prevent real API calls."""
+    from unittest.mock import patch
+    with patch.dict("os.environ", {
+        "TELEGRAM_BOT_TOKEN": "test_bot_token_123456",
+        "TELEGRAM_CHAT_ID": "test_chat_id_123456"
+    }):
+        yield
 
 
 @pytest.fixture(autouse=True)

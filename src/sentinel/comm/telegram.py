@@ -11,6 +11,7 @@ from .chat_history import chat_history_manager
 
 load_dotenv()
 
+TELEGRAM_API_HOST = "api.telegram.org"
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -21,7 +22,7 @@ class TelegramBot:
     def __init__(self, bot_token: Optional[str] = None, chat_id: Optional[str] = None):
         self.bot_token = bot_token or TELEGRAM_BOT_TOKEN
         self.chat_id = chat_id or TELEGRAM_CHAT_ID
-        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self.base_url = f"https://{TELEGRAM_API_HOST}/bot{self.bot_token}"
 
         if not self.bot_token:
             raise ValueError("Telegram bot token is required")

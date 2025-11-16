@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models for the Sentinel application."""
 
-from datetime import datetime
+import datetime
 from typing import Any, Dict, Optional
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
@@ -22,8 +22,15 @@ class ChatMessage(Base):
     username = Column(String, nullable=True)
     message_text = Column(Text, nullable=False)
     message_type = Column(String, default="user", nullable=False)  # 'user' or 'bot'
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(
+        DateTime,
+        default=datetime.datetime.now(datetime.UTC),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(
+        DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False
+    )
     extra_data = Column(
         JSON, nullable=True
     )  # Renamed from 'metadata' to avoid conflict
@@ -39,7 +46,9 @@ class TrackedStock(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     symbol = Column(String, unique=True, nullable=False, index=True)
-    added_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    added_at = Column(
+        DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False
+    )
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Relationship with alert history
@@ -63,7 +72,9 @@ class AlertHistory(Base):
     alert_date = Column(
         String, nullable=False
     )  # Store as YYYY-MM-DD string for compatibility
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(
+        DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False
+    )
     alert_type = Column(String, default="daily", nullable=False)
     message_content = Column(Text, nullable=True)
 
@@ -87,8 +98,12 @@ class UserSession(Base):
     last_name = Column(String, nullable=True)
     language_code = Column(String, default="en", nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    first_interaction = Column(DateTime, default=datetime.utcnow, nullable=False)
-    last_interaction = Column(DateTime, default=datetime.utcnow, nullable=False)
+    first_interaction = Column(
+        DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False
+    )
+    last_interaction = Column(
+        DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False
+    )
     preferences = Column(JSON, nullable=True)
 
     def __repr__(self):
@@ -96,4 +111,4 @@ class UserSession(Base):
 
     def update_last_interaction(self):
         """Update the last interaction timestamp."""
-        self.last_interaction = datetime.utcnow()
+        self.last_interaction = datetime.datetime.now(datetime.UTC)

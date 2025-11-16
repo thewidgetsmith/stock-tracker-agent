@@ -1,5 +1,6 @@
 """Chat history storage and management using SQLAlchemy ORM."""
 
+import datetime
 from typing import Any, Dict, List, Optional
 
 from ..db.database import get_session_sync
@@ -48,7 +49,7 @@ class ChatHistoryManager:
                 message_id=message_id,
                 metadata=metadata,
             )
-            return int(message.id)
+            return int(message.id)  # type: ignore
 
     def store_bot_response(
         self, chat_id: str, message_text: str, metadata: Optional[Dict[str, Any]] = None
@@ -68,7 +69,7 @@ class ChatHistoryManager:
             message = repo.store_bot_response(
                 chat_id=chat_id, message_text=message_text, metadata=metadata
             )
-            return message.id
+            return int(message.id)  # type: ignore
 
     def get_chat_history(
         self, chat_id: str, limit: int = 10, include_bot_messages: bool = True
@@ -140,12 +141,12 @@ class ChatHistoryManager:
         Returns:
             Number of deleted messages
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         from ..db.models import ChatMessage
 
         with get_session_sync() as session:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             deleted_count = (
                 session.query(ChatMessage)
