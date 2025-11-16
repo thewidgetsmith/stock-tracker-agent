@@ -48,8 +48,11 @@ def isolated_db():
 @pytest.fixture
 def mock_db_session(isolated_db):
     """Mock database session to use isolated test database."""
-    with patch("sentinel.db.database.SessionLocal", isolated_db["session_factory"]):
-        with patch("sentinel.db.database.engine", isolated_db["engine"]):
+    with patch(
+        "sentinel.db.database.get_session_factory",
+        lambda: isolated_db["session_factory"],
+    ):
+        with patch("sentinel.db.database.get_engine", lambda: isolated_db["engine"]):
             with patch(
                 "sentinel.db.database.get_session_sync",
                 lambda: isolated_db["session_factory"](),

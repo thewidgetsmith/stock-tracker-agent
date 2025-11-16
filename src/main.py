@@ -141,7 +141,7 @@ def main() -> None:
         # Start the FastAPI server
         try:
             uvicorn.run(
-                "main:app",
+                "sentinel.webapi.app:app",
                 host=settings.endpoint_host,
                 port=settings.endpoint_port,
                 reload=settings.api_reload,  # Use configured reload setting
