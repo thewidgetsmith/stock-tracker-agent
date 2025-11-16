@@ -123,6 +123,11 @@ def get_summarizer_config() -> Dict[str, Any]:
     return get_agent_config("summarizer")
 
 
+def get_conversation_summarizer_config() -> Dict[str, Any]:
+    """Get conversation summarizer agent configuration."""
+    return get_agent_config("conversation_summarizer")
+
+
 def get_error_message(error_type: str) -> str:
     """
     Get an error message template.

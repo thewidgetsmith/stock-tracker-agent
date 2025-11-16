@@ -1,21 +1,18 @@
 """Stock tracking functionality and automated monitoring."""
 
-import json
 import asyncio
 from datetime import date
 from typing import List
 
-from .stock_checker import get_stock_price
 from ..agents.handlers import run_research_pipeline
+from ..db.repositories import AlertHistoryRepository, TrackedStockRepository
+from .stock_checker import get_stock_price
 
 
 def get_tracked_stocks() -> List[str]:
     """Get the current list of tracked stocks."""
-    try:
-        with open("resources/tracker_list.json", "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
+    with TrackedStockRepository() as repo:
+        return repo.get_stock_symbols()
 
 
 def update_alert_history(symbol: str) -> bool:
@@ -24,29 +21,22 @@ def update_alert_history(symbol: str) -> bool:
 
     Returns False if already alerted today, True if new alert should be sent.
     """
-    try:
-        with open("resources/alert_history.json", "r") as f:
-            alert_history = json.load(f)
-    except FileNotFoundError:
-        alert_history = {}
+    today_str = str(date.today())
 
-    if symbol not in alert_history:
-        alert_history[symbol] = []
+    with AlertHistoryRepository() as repo:
+        # Check if we have already alerted the user today
+        if repo.has_alert_been_sent(symbol, today_str):
+            print(f"Already alerted user about {symbol} today.")
+            return False
 
-    today = str(date.today())
-
-    # Check if we have already alerted the user today
-    if alert_history[symbol] and alert_history[symbol][-1] == today:
-        print(f"Already alerted user about {symbol} today.")
-        return False
-
-    # Add today's alert
-    alert_history[symbol].append(today)
-
-    with open("resources/alert_history.json", "w") as f:
-        json.dump(alert_history, f)
-
-    return True
+        # Add today's alert
+        repo.add_alert(
+            symbol,
+            today_str,
+            alert_type="daily",
+            message_content=f"Daily alert for {symbol}",
+        )
+        return True
 
 
 def track_stocks() -> None:
@@ -74,11 +64,11 @@ def track_stocks() -> None:
 
                 # Check if we should send an alert (not already sent today)
                 if update_alert_history(symbol):
-                    asyncio.run(run_research_pipeline(
-                        symbol,
-                        stock_info.current_price,
-                        stock_info.previous_close
-                    ))
+                    asyncio.run(
+                        run_research_pipeline(
+                            symbol, stock_info.current_price, stock_info.previous_close
+                        )
+                    )
 
         except Exception as e:
             print(f"Error tracking {symbol}: {e}")

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ..agents.handlers import handle_incoming_message
+from ..comm.chat_history import chat_history_manager
 from ..comm.telegram import telegram_bot
 
 # Security scheme for Bearer token authentication
@@ -111,8 +112,21 @@ def create_app() -> FastAPI:
 
             print(f"Received message from {chat_id}: {text}")
 
+            # Store the incoming user message in chat history
+            user_info = update.get("message", {}).get("from", {})
+            username = user_info.get("first_name", "User")
+            message_id = update.get("message", {}).get("message_id")
+
+            chat_history_manager.store_user_message(
+                chat_id=chat_id,
+                message_text=text,
+                user_id=user_id,
+                username=username,
+                message_id=str(message_id) if message_id else None,
+            )
+
             # Process the message
-            response_text = await handle_incoming_message(text)
+            response_text = await handle_incoming_message(text, chat_id=chat_id)
 
             # Send response back to user
             await telegram_bot.send_message(response_text, chat_id=chat_id)

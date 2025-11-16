@@ -8,6 +8,7 @@ import pytest
 
 sys.path.append("src")
 from stock_tracker.agents.handlers import (
+    conversation_summarizer_agent,
     handle_incoming_message,
     message_handler_agent,
     run_research_pipeline,
@@ -36,6 +37,12 @@ class TestAgentCreation:
         assert summarizer_agent.name == "Summarizer Agent"
         assert summarizer_agent.model == "gpt-4o-mini"
         assert len(summarizer_agent.tools) == 0  # Summarizer has no tools
+
+    def test_conversation_summarizer_agent_created(self):
+        """Test conversation summarizer agent is created correctly."""
+        assert conversation_summarizer_agent.name == "Conversation History Summarizer"
+        assert conversation_summarizer_agent.model == "gpt-4o-mini"
+        assert len(conversation_summarizer_agent.tools) == 0  # Summarizer has no tools
 
 
 class TestHandleIncomingMessage:
@@ -258,3 +265,277 @@ async def test_percentage_calculations(current_price, previous_close, expected_c
                 mock_template.return_value.format = capture_format
 
                 await run_research_pipeline("TEST", current_price, previous_close)
+
+
+class TestConversationHistory:
+    """Test conversation history functionality."""
+
+    @pytest.mark.asyncio
+    async def test_handle_message_with_conversation_history(self):
+        """Test that conversation history is fetched and used when chat_id is provided."""
+        # Mock the conversation summary from chat history manager
+        with patch(
+            "stock_tracker.agents.handlers.chat_history_manager"
+        ) as mock_history_manager:
+            mock_history_manager.get_conversation_summary.return_value = (
+                "User: What's the price of AAPL?\n"
+                "Bot: AAPL is currently trading at $150.00"
+            )
+
+            # Mock the Runner.run method for both agents
+            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+                # Mock response for conversation summarizer
+                mock_summarizer_response = AsyncMock()
+                mock_summarizer_response.final_output = (
+                    "User previously asked about AAPL stock price"
+                )
+
+                # Mock response for message handler
+                mock_handler_response = AsyncMock()
+                mock_handler_response.final_output = (
+                    "Based on our conversation, I can help track AAPL."
+                )
+
+                # Configure Runner.run to return different responses
+                def mock_run(agent, message):
+                    if "Conversation History Summarizer" in str(agent.name):
+                        return mock_summarizer_response
+                    else:
+                        return mock_handler_response
+
+                mock_runner.run = AsyncMock(side_effect=mock_run)
+
+                # Test the function with a chat_id
+                result = await handle_incoming_message(
+                    "Track AAPL stock", chat_id="test_chat_123"
+                )
+
+                # Verify that get_conversation_summary was called with the correct chat_id
+                mock_history_manager.get_conversation_summary.assert_called_once_with(
+                    "test_chat_123", limit=5
+                )
+
+                # Verify that Runner.run was called twice
+                assert mock_runner.run.call_count == 2
+
+                # Check the final result
+                assert result == "Based on our conversation, I can help track AAPL."
+
+                # Verify the conversation context was included in the message handler call
+                handler_call_args = mock_runner.run.call_args_list[1][0]
+                full_message = handler_call_args[1]
+                assert "Track AAPL stock" in full_message
+                assert "Conversation Context:" in full_message
+                assert "User previously asked about AAPL stock price" in full_message
+
+    @pytest.mark.asyncio
+    async def test_handle_message_without_chat_id(self):
+        """Test that function works normally when no chat_id is provided."""
+        with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+            mock_response = AsyncMock()
+            mock_response.final_output = "I can help you with stock information."
+            mock_runner.run = AsyncMock(return_value=mock_response)
+
+            result = await handle_incoming_message("Get stock info")
+
+            # Should only call Runner.run once (no conversation summarizer)
+            mock_runner.run.assert_called_once()
+
+            # Message should not contain conversation context
+            call_args = mock_runner.run.call_args[0]
+            message = call_args[1]
+
+            assert message == "Get stock info"  # No additional context
+            assert "Conversation Context:" not in message
+            assert result == "I can help you with stock information."
+
+    @pytest.mark.asyncio
+    async def test_handle_message_with_empty_chat_history(self):
+        """Test handling when chat history is empty."""
+        with patch(
+            "stock_tracker.agents.handlers.chat_history_manager"
+        ) as mock_history_manager:
+            # Return the default "no history" message
+            mock_history_manager.get_conversation_summary.return_value = (
+                "No previous conversation history."
+            )
+
+            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+                mock_response = AsyncMock()
+                mock_response.final_output = "How can I help you?"
+                mock_runner.run = AsyncMock(return_value=mock_response)
+
+                result = await handle_incoming_message("Hello", chat_id="test_chat")
+
+                # Should only call message handler (no conversation summarizer for empty history)
+                mock_runner.run.assert_called_once()
+
+                # Message should be unchanged
+                call_args = mock_runner.run.call_args[0]
+                message = call_args[1]
+                assert message == "Hello"
+                assert "Conversation Context:" not in message
+
+    @pytest.mark.asyncio
+    async def test_handle_message_with_chat_history_error(self):
+        """Test handling when chat history fetch fails."""
+        with patch("stock_tracker.agents.handlers.telegram_bot") as mock_telegram_bot:
+            # Simulate error in get_chat_history
+            mock_telegram_bot.get_chat_history = AsyncMock(
+                side_effect=Exception("API Error")
+            )
+
+            with patch("stock_tracker.agents.handlers.get_error_message") as mock_error:
+                mock_error.return_value = (
+                    "Sorry, there was an error processing your request."
+                )
+
+                result = await handle_incoming_message(
+                    "Track NVDA", chat_id="test_chat"
+                )
+
+                # Should call error handler
+                mock_error.assert_called_once_with("general_error")
+                assert result == "Sorry, there was an error processing your request."
+
+    @pytest.mark.asyncio
+    async def test_conversation_summarizer_agent_functionality(self):
+        """Test the conversation summarizer agent directly."""
+        mock_chat_history = [
+            {
+                "message_id": 1,
+                "text": "What's TSLA doing today?",
+                "from": {"first_name": "Alice"},
+                "date": 1640000000,
+            },
+            {
+                "message_id": 2,
+                "text": "Add MSFT to my watchlist",
+                "from": {"first_name": "Alice"},
+                "date": 1640000100,
+            },
+        ]
+
+        with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+            mock_response = AsyncMock()
+            mock_response.final_output = "User asked about TSLA and wants to track MSFT"
+            mock_runner.run = AsyncMock(return_value=mock_response)
+
+            # Test that the agent receives the properly formatted history
+            with patch(
+                "stock_tracker.agents.handlers.telegram_bot"
+            ) as mock_telegram_bot:
+                mock_telegram_bot.get_chat_history = AsyncMock(
+                    return_value=mock_chat_history
+                )
+
+                await handle_incoming_message("Show my portfolio", chat_id="test_chat")
+
+                # Check that the conversation summarizer was called with the history
+                summarizer_call = mock_runner.run.call_args_list[0]
+                summarizer_agent_used = summarizer_call[0][0]
+                history_message = summarizer_call[0][1]
+
+                assert "Conversation History Summarizer" in summarizer_agent_used.name
+                # The actual format includes the full JSON representation
+                assert "Recent conversation history:" in history_message
+                assert "What's TSLA doing today?" in history_message
+                assert "Add MSFT to my watchlist" in history_message
+
+    @pytest.mark.asyncio
+    async def test_message_handler_receives_enhanced_context(self):
+        """Test that the message handler receives the enhanced message with context."""
+        mock_chat_history = [
+            {
+                "message_id": 1,
+                "text": "I'm interested in tech stocks",
+                "from": {"first_name": "Bob"},
+                "date": 1640000000,
+            }
+        ]
+
+        with patch("stock_tracker.agents.handlers.telegram_bot") as mock_telegram_bot:
+            mock_telegram_bot.get_chat_history = AsyncMock(
+                return_value=mock_chat_history
+            )
+
+            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+                # Mock conversation summarizer response
+                mock_summarizer_response = AsyncMock()
+                mock_summarizer_response.final_output = (
+                    "User is interested in technology stocks"
+                )
+
+                # Mock message handler response
+                mock_handler_response = AsyncMock()
+                mock_handler_response.final_output = (
+                    "Here are some tech stocks to consider"
+                )
+
+                def mock_run(agent, message):
+                    if "Conversation History Summarizer" in str(agent.name):
+                        return mock_summarizer_response
+                    else:
+                        # Verify the enhanced message format
+                        assert "What tech stocks do you recommend?" in message
+                        assert (
+                            "\n\nConversation Context: User is interested in technology stocks"
+                            in message
+                        )
+                        return mock_handler_response
+
+                mock_runner.run = AsyncMock(side_effect=mock_run)
+
+                result = await handle_incoming_message(
+                    "What tech stocks do you recommend?", chat_id="test_chat"
+                )
+
+                assert result == "Here are some tech stocks to consider"
+                assert mock_runner.run.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_conversation_history_with_multiple_users(self):
+        """Test conversation history handling with multiple users in chat."""
+        mock_chat_history = [
+            {
+                "message_id": 1,
+                "text": "AAPL earnings today",
+                "from": {"first_name": "Alice"},
+                "date": 1640000000,
+            },
+            {
+                "message_id": 2,
+                "text": "Good luck!",
+                "from": {"first_name": "Bob"},
+                "date": 1640000100,
+            },
+        ]
+
+        with patch("stock_tracker.agents.handlers.telegram_bot") as mock_telegram_bot:
+            mock_telegram_bot.get_chat_history = AsyncMock(
+                return_value=mock_chat_history
+            )
+
+            with patch("stock_tracker.agents.handlers.Runner") as mock_runner:
+                mock_summarizer_response = AsyncMock()
+                mock_summarizer_response.final_output = "Discussion about AAPL earnings"
+
+                mock_handler_response = AsyncMock()
+                mock_handler_response.final_output = "AAPL earnings were strong"
+
+                def mock_run(agent, message):
+                    if "Conversation History Summarizer" in str(agent.name):
+                        # Verify both users' messages are included in the history
+                        assert "AAPL earnings today" in message
+                        assert "Good luck!" in message
+                        assert "Alice" in message
+                        assert "Bob" in message
+                        return mock_summarizer_response
+                    else:
+                        return mock_handler_response
+
+                mock_runner.run = AsyncMock(side_effect=mock_run)
+
+                await handle_incoming_message("How did AAPL do?", chat_id="group_chat")
+
+                assert mock_runner.run.call_count == 2

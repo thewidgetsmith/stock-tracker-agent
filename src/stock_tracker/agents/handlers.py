@@ -2,7 +2,8 @@
 
 from agents import Agent, Runner, WebSearchTool
 
-from ..comm.telegram import send_telegram_message
+from ..comm.chat_history import chat_history_manager
+from ..comm.telegram import send_telegram_message, telegram_bot
 from ..core.tools import (
     add_stock_to_tracker,
     get_stock_price_info,
@@ -10,6 +11,7 @@ from ..core.tools import (
     remove_stock_from_tracker,
 )
 from .prompts import (
+    get_conversation_summarizer_config,
     get_error_message,
     get_message_handler_config,
     get_research_pipeline_template,
@@ -21,6 +23,7 @@ from .prompts import (
 _message_handler_config = get_message_handler_config()
 _stock_research_config = get_stock_research_config()
 _summarizer_config = get_summarizer_config()
+_conversation_summarizer_config = get_conversation_summarizer_config()
 
 # Message handling agent for processing user commands
 message_handler_agent = Agent(
@@ -53,12 +56,21 @@ summarizer_agent = Agent(
 )
 
 
-async def handle_incoming_message(message: str) -> str:
+# Conversation summarizer agent for analyzing chat history
+conversation_summarizer_agent = Agent(
+    name=_conversation_summarizer_config["name"],
+    instructions=_conversation_summarizer_config["instructions"],
+    model=_conversation_summarizer_config["model"],
+)
+
+
+async def handle_incoming_message(message: str, chat_id: str | None = None) -> str:
     """
     Handle incoming user messages and return appropriate responses.
 
     Args:
         message: User message text
+        chat_id: Telegram chat ID to fetch conversation history
 
     Returns:
         Response text for the user
@@ -66,7 +78,30 @@ async def handle_incoming_message(message: str) -> str:
     print("Processing message:", message)
 
     try:
-        response = await Runner.run(message_handler_agent, message)
+        # Fetch conversation history if chat_id is provided
+        conversation_context = ""
+        if chat_id:
+            # Get conversation summary from local storage
+            conversation_summary = chat_history_manager.get_conversation_summary(
+                chat_id, limit=5
+            )
+            if (
+                conversation_summary
+                and conversation_summary != "No previous conversation history."
+            ):
+                # Summarize the conversation history for context using AI
+                history_response = await Runner.run(
+                    conversation_summarizer_agent,
+                    f"Recent conversation history:\n{conversation_summary}",
+                )
+                conversation_context = (
+                    f"\n\nConversation Context: {history_response.final_output}"
+                )
+
+        # Include conversation context with the current message
+        full_message = message + conversation_context
+
+        response = await Runner.run(message_handler_agent, full_message)
         return response.final_output
     except Exception as e:
         print(f"Error handling message: {e}")

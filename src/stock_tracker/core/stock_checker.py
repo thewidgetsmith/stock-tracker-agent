@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class StockPriceResponse(BaseModel):
     """Response model for stock price information."""
+
     current_price: float
     previous_close: float
 
@@ -32,6 +33,10 @@ def get_stock_price(symbol: str) -> StockPriceResponse:
     previous_close = stock.history(period="5d")["Close"].dropna().iloc[-2]
 
     return StockPriceResponse(
-        current_price=current_price,
-        previous_close=previous_close
+        current_price=current_price, previous_close=previous_close
     )
+
+
+# TODO: Add handling for invalid stock symbols and API errors
+# TODO: Add functionality for cryptocurrency price checking
+# TODO: Add functionality for following specific people

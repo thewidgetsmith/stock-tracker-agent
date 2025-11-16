@@ -5,6 +5,10 @@ agents:
       Handle incoming messages from the user and determine the appropriate actions to take.
       If a message is requesting edits to the tracker list, always retrieve the tracker list first
       using the 'get_stock_tracker_list' tool to double check for spelling and grammar errors.
+      
+      User messages may include conversation context at the end that provides background about recent
+      discussions. Use this context to better understand the user's intent and provide more relevant responses.
+      
       Respond to the user in a friendly manner. Try to respond in under 160 characters.
     model: "gpt-4o-mini"
 
@@ -33,6 +37,22 @@ agents:
 
       OUTPUT: You should write a message to the user as if you were making them aware of the price change and
       the potential reasons behind it. The start of your message should be "(symbol) DOWN/UP (percentage change)%: "
+    model: "gpt-4o-mini"
+
+  conversation_summarizer:
+    name: "Conversation History Summarizer"
+    instructions: |
+      You are a Conversation History Summarizer. Your job is to analyze recent conversation history and extract
+      relevant context for handling the current user message.
+
+      Focus on:
+      - Recent stock symbols mentioned
+      - User preferences or requests
+      - Previous questions or topics discussed
+      - Any ongoing conversations or context
+
+      Provide a concise summary of relevant conversation context in 2-3 sentences that will help
+      inform how to respond to the current user message. If there's no relevant context, just say "No relevant context."
     model: "gpt-4o-mini"
 
 # Optional: Store other prompts that might be used in the system

@@ -15,23 +15,17 @@ REQUIRED_VARS = [
 
 
 def ensure_resources_directory() -> None:
-    """Ensure the resources directory and required files exist."""
-    resources_path = Path("resources")
+    """Ensure the resources directory and database are initialized."""
+    from pathlib import Path
+
+    resources_path = Path("data")
     resources_path.mkdir(exist_ok=True)
 
-    # Create alert_history.json if it doesn't exist
-    alert_history_path = resources_path / "alert_history.json"
-    if not alert_history_path.exists():
-        with open(alert_history_path, "w") as f:
-            json.dump({}, f)
-        print("Created alert_history.json")
+    # Initialize database tables
+    from ..db.database import create_tables
 
-    # Create tracker_list.json if it doesn't exist
-    tracker_list_path = resources_path / "tracker_list.json"
-    if not tracker_list_path.exists():
-        with open(tracker_list_path, "w") as f:
-            json.dump([], f)
-        print("Created tracker_list.json")
+    create_tables()
+    print("Ensured database tables exist")
 
 
 def load_config() -> Dict[str, Any]:

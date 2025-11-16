@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional
 import aiohttp
 from dotenv import load_dotenv
 
+from .chat_history import chat_history_manager
+
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -53,6 +55,8 @@ class TelegramBot:
                 async with session.post(url, json=data) as response:
                     if response.status == 200:
                         print(f"Message sent successfully to chat {target_chat_id}")
+                        # Store the outgoing message in chat history
+                        self.store_outgoing_message(text, target_chat_id)
                         return True
                     else:
                         error_text = await response.text()
@@ -120,6 +124,43 @@ class TelegramBot:
         except Exception as e:
             print(f"Error deleting webhook: {e}")
             return False
+
+    def store_outgoing_message(self, text: str, chat_id: Optional[str] = None) -> None:
+        """
+        Store an outgoing bot message in chat history.
+
+        Args:
+            text: Message text sent by bot
+            chat_id: Target chat ID
+        """
+        target_chat_id = chat_id or self.chat_id
+        if target_chat_id:
+            chat_history_manager.store_bot_response(target_chat_id, text)
+
+    def get_chat_history(
+        self, chat_id: Optional[str] = None, limit: int = 10
+    ) -> list[Dict[str, Any]]:
+        """
+        Get recent chat history from local storage.
+
+        Args:
+            chat_id: Target chat ID (uses default if not provided)
+            limit: Maximum number of messages to retrieve
+
+        Returns:
+            List of message objects in chronological order (oldest first)
+        """
+        target_chat_id = chat_id or self.chat_id
+
+        if not target_chat_id:
+            print("Error: No chat ID provided for history retrieval")
+            return []
+
+        try:
+            return chat_history_manager.get_chat_history(target_chat_id, limit)
+        except Exception as e:
+            print(f"Error getting chat history: {e}")
+            return []
 
     def extract_message_info(
         self, update: Dict[str, Any]
