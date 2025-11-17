@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     openai_max_tokens: int = 4000
     openai_temperature: float = 0.7
 
+    # External API settings
+    quiver_api_token: Optional[str] = None  # For congressional trading data
+
     # Tracking settings
     tracking_interval_minutes: int = 60
     price_change_threshold: float = 0.01

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 
 from ..config.logging import get_logger
 from ..config.settings import get_settings
-from ..db.database import check_database_health
+from ..ormdb.database import check_database_health
 from .models.requests import HealthCheckRequest
 from .models.responses import HealthResponse, HealthStatus
 

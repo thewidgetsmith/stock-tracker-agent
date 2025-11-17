@@ -21,7 +21,7 @@ from sentinel.config.logging import get_logger
 
 # Import configuration system
 from sentinel.config.settings import get_settings
-from sentinel.core.stock_checker import get_stock_price
+from sentinel.core.stock_query import get_stock_price
 from sentinel.scheduler import (
     add_stock_tracking_job,
     list_scheduled_jobs,

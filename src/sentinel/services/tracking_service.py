@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import List, Optional, Set
 
 from ..config.logging import get_logger
-from ..db.database import get_session
-from ..db.repositories import TrackedStockRepository
+from ..ormdb.database import get_session
+from ..ormdb.repositories import TrackedStockRepository
 from .stock_service import MovementThreshold, StockAnalysis, StockService
 
 logger = get_logger(__name__)

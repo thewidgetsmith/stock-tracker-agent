@@ -3,8 +3,8 @@
 import datetime
 from typing import Any, Dict, List, Optional
 
-from ..db.database import get_session_sync
-from ..db.repositories import ChatMessageRepository
+from ..ormdb.database import get_session_sync
+from ..ormdb.repositories import ChatMessageRepository
 
 
 class ChatHistoryManager:
@@ -13,7 +13,7 @@ class ChatHistoryManager:
     def __init__(self):
         """Initialize the chat history manager."""
         # Ensure database tables are created
-        from ..db.database import create_tables
+        from ..ormdb.database import create_tables
 
         create_tables()
 
@@ -143,7 +143,7 @@ class ChatHistoryManager:
         """
         from datetime import datetime, timedelta, timezone
 
-        from ..db.models import ChatMessage
+        from ..ormdb.models import ChatMessage
 
         with get_session_sync() as session:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)

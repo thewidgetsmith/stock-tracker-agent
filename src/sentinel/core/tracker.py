@@ -5,8 +5,8 @@ from datetime import date
 from typing import List
 
 from ..agents.handlers import run_research_pipeline
-from ..db.repositories import AlertHistoryRepository, TrackedStockRepository
-from .stock_checker import get_stock_price
+from ..ormdb.repositories import AlertHistoryRepository, TrackedStockRepository
+from .stock_query import get_stock_price
 
 
 def get_tracked_stocks() -> List[str]:

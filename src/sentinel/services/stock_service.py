@@ -6,9 +6,9 @@ from enum import Enum
 from typing import List, Optional
 
 from ..config.logging import get_logger
-from ..core.stock_checker import StockPriceResponse, get_stock_price
-from ..db.database import get_session
-from ..db.repositories import TrackedStockRepository
+from ..core.stock_query import StockPriceResponse, get_stock_price
+from ..ormdb.database import get_session
+from ..ormdb.repositories import TrackedStockRepository
 
 logger = get_logger(__name__)
 

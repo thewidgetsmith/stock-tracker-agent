@@ -4,10 +4,15 @@ from agents import Agent, Runner, WebSearchTool
 
 from ..comm.chat_history import chat_history_manager
 from ..comm.telegram import send_telegram_message, telegram_bot
+from ..config.logging import get_logger
 from ..core.agent_tools import (
+    add_politician_to_tracker,
     add_stock_to_tracker,
+    get_politician_activity_info,
     get_stock_price_info,
+    get_tracked_politicians_list,
     get_tracked_stocks_list,
+    remove_politician_from_tracker,
     remove_stock_from_tracker,
 )
 from .prompts import (
@@ -18,6 +23,8 @@ from .prompts import (
     get_stock_research_config,
     get_summarizer_config,
 )
+
+logger = get_logger(__name__)
 
 # Load agent configurations from external prompts
 _message_handler_config = get_message_handler_config()
@@ -30,10 +37,14 @@ message_handler_agent = Agent(
     name=_message_handler_config["name"],
     instructions=_message_handler_config["instructions"],
     tools=[
-        get_stock_price_info,
         add_stock_to_tracker,
-        remove_stock_from_tracker,
+        add_politician_to_tracker,
+        get_stock_price_info,
         get_tracked_stocks_list,
+        get_tracked_politicians_list,
+        get_politician_activity_info,
+        remove_stock_from_tracker,
+        remove_politician_from_tracker,
     ],
     model=_message_handler_config["model"],
 )
@@ -75,7 +86,7 @@ async def handle_incoming_message(message: str, chat_id: str | None = None) -> s
     Returns:
         Response text for the user
     """
-    print("Processing message:", message)
+    logger.info("Processing message:")  # , message)
 
     try:
         # Fetch conversation history if chat_id is provided
@@ -104,7 +115,7 @@ async def handle_incoming_message(message: str, chat_id: str | None = None) -> s
         response = await Runner.run(message_handler_agent, full_message)
         return response.final_output
     except Exception as e:
-        print(f"Error handling message: {e}")
+        logger.error(f"Error handling message: {e}")
         return get_error_message("general_error")
 
 
@@ -122,12 +133,12 @@ async def run_research_pipeline(
     Returns:
         Final research summary
     """
-    print(f"Running research pipeline for {stock_symbol}")
+    logger.info(f"Running research pipeline for {stock_symbol}")
 
     try:
         # Run stock research
         response = await Runner.run(stock_research_agent, stock_symbol)
-        print(f"Research pipeline response: {response}")
+        logger.info(f"Research pipeline response: {response}")
 
         # Calculate percentage change
         change_percent = (current_price / previous_close - 1) * 100
@@ -142,7 +153,7 @@ async def run_research_pipeline(
 
         # Generate summary
         summarizer_response = await Runner.run(summarizer_agent, message_to_summarizer)
-        print(f"Summarizer response: {summarizer_response}")
+        logger.info(f"Summarizer response: {summarizer_response}")
 
         final_output = summarizer_response.final_output
 
@@ -152,7 +163,7 @@ async def run_research_pipeline(
         return final_output
 
     except Exception as e:
-        print(f"Error in research pipeline: {e}")
+        logger.error(f"Error in research pipeline: {e}")
         error_template = get_error_message("research_failed")
         error_message = error_template.format(stock_symbol=stock_symbol)
         await send_telegram_message(error_message)

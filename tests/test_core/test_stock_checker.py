@@ -14,7 +14,7 @@ class TestStockChecker:
     @patch("sentinel.core.stock_checker.yf")
     def test_get_stock_price_success(self, mock_yf):
         """Test successful stock price retrieval."""
-        from sentinel.core.stock_checker import get_stock_price
+        from sentinel.core.stock_query import get_stock_price
 
         # Setup mock yfinance ticker with proper nested structure
         mock_ticker = Mock()
@@ -59,7 +59,7 @@ class TestStockChecker:
     @patch("sentinel.core.stock_checker.yf")
     def test_get_stock_price_ticker_error(self, mock_yf):
         """Test error handling when yfinance ticker creation fails."""
-        from sentinel.core.stock_checker import get_stock_price
+        from sentinel.core.stock_query import get_stock_price
 
         mock_yf.Ticker.side_effect = Exception("Network error")
 
@@ -69,7 +69,7 @@ class TestStockChecker:
     @patch("sentinel.core.stock_checker.yf")
     def test_get_stock_price_history_error(self, mock_yf):
         """Test error handling when history data is unavailable."""
-        from sentinel.core.stock_checker import get_stock_price
+        from sentinel.core.stock_query import get_stock_price
 
         mock_ticker = Mock()
         mock_ticker.history.side_effect = Exception("History unavailable")
@@ -81,7 +81,7 @@ class TestStockChecker:
     @patch("sentinel.core.stock_checker.yf")
     def test_get_stock_price_missing_data(self, mock_yf):
         """Test handling when some data is missing."""
-        from sentinel.core.stock_checker import get_stock_price
+        from sentinel.core.stock_query import get_stock_price
 
         mock_ticker = Mock()
 
@@ -105,7 +105,7 @@ class TestStockChecker:
 
     def test_stock_price_response_model(self):
         """Test StockPriceResponse model creation."""
-        from sentinel.core.stock_checker import StockPriceResponse
+        from sentinel.core.stock_query import StockPriceResponse
 
         response = StockPriceResponse(current_price=150.0, previous_close=148.0)
 
@@ -116,7 +116,7 @@ class TestStockChecker:
         """Test StockPriceResponse validation."""
         from pydantic import ValidationError
 
-        from sentinel.core.stock_checker import StockPriceResponse
+        from sentinel.core.stock_query import StockPriceResponse
 
         # Test invalid data types
         with pytest.raises(ValidationError):
@@ -127,7 +127,7 @@ class TestStockChecker:
     @patch("sentinel.core.stock_checker.yf")
     def test_get_stock_price_empty_data_fallback(self, mock_yf):
         """Test fallback when 1-day data is empty."""
-        from sentinel.core.stock_checker import get_stock_price
+        from sentinel.core.stock_query import get_stock_price
 
         mock_ticker = Mock()
 
@@ -168,7 +168,7 @@ class TestStockChecker:
     @patch("sentinel.core.stock_checker.yf")
     def test_multiple_stock_calls(self, mock_yf):
         """Test multiple sequential stock price calls."""
-        from sentinel.core.stock_checker import get_stock_price
+        from sentinel.core.stock_query import get_stock_price
 
         # Setup different mock responses for different symbols
         def mock_ticker_factory(symbol):

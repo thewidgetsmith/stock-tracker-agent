@@ -25,7 +25,7 @@ def isolated_db():
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
         # Create tables
-        from sentinel.db.models import Base
+        from sentinel.ormdb.models import Base
 
         Base.metadata.create_all(bind=engine)
 

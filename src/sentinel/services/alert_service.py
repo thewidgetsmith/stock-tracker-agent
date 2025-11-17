@@ -6,8 +6,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from ..config.logging import get_logger
-from ..db.database import get_session
-from ..db.repositories import AlertHistoryRepository
+from ..ormdb.database import get_session
+from ..ormdb.repositories import AlertHistoryRepository
 from .stock_service import StockAnalysis
 
 logger = get_logger(__name__)

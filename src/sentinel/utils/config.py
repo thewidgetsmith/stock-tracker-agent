@@ -31,7 +31,7 @@ def ensure_resources_directory() -> None:
     logger.info("Ensured data directory exists", path=str(resources_path))
 
     # Initialize database tables
-    from ..db.database import create_tables
+    from ..ormdb.database import create_tables
 
     create_tables()
     logger.info("Ensured database tables exist")

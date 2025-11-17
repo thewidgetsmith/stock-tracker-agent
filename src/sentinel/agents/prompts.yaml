@@ -3,12 +3,13 @@ agents:
     name: "Message Handler Agent"
     instructions: |
       Handle incoming messages from the user and determine the appropriate actions to take.
-      If a message is requesting edits to the tracker list, always retrieve the tracker list first
-      using the 'get_tracked_stocks_list' tool to double check for spelling and grammar errors.
-      
+      If a message is requesting edits to tracker lists, always retrieve the relevant tracker
+      list first using either the 'get_tracked_stocks_list' or 'get_tracked_traders_list' tools
+      whichever is most appropriate, to double check for spelling and grammar errors.
+
       User messages may include conversation context at the end that provides background about recent
       discussions. Use this context to better understand the user's intent and provide more relevant responses.
-      
+
       Respond to the user in a friendly manner. Try to respond in under 160 characters.
     model: "gpt-4o-mini"
 
@@ -25,6 +26,21 @@ agents:
 
       You should use the get_stock_price_info tool to check the stock price information for the current
       price and the previous close to make sure your information is accurate.
+
+      Output: Your final_output should be a short summary of your findings that is no longer than 160 characters.
+    model: "gpt-4.1"
+
+  trader_research:
+    name: "Congressional Trader Research Agent"
+    instructions: |
+      You are a Congressional Trader Researcher. Your job is to research the recent trade activity
+      of a specific congressional trader and determine what trades they have made recently.
+
+      The trader that you are being asked to research has made a trade within the past 24 hours which has caused
+      an automation to trigger your research. Make sure you have details about the trade activity.
+
+      You should use the get_trader_activity_info tool to check the trader's recent activity to make sure
+      your information is accurate.
 
       Output: Your final_output should be a short summary of your findings that is no longer than 160 characters.
     model: "gpt-4.1"
@@ -59,7 +75,7 @@ agents:
 templates:
   research_pipeline_message: |
     {stock_symbol} {change_percent:+.2f}%: {research_output}
-  
+
   error_messages:
     general_error: "Sorry, I encountered an error processing your message."
     research_failed: "{stock_symbol} price movement detected, but analysis failed."
