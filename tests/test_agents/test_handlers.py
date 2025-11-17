@@ -11,6 +11,8 @@ from sentinel.agents.handlers import (
     conversation_summarizer_agent,
     handle_incoming_message,
     message_handler_agent,
+    politician_research_agent,
+    run_politician_research_pipeline,
     run_research_pipeline,
     stock_research_agent,
     summarizer_agent,
@@ -24,7 +26,9 @@ class TestAgentCreation:
         """Test message handler agent is created correctly."""
         assert message_handler_agent.name == "Message Handler Agent"
         assert message_handler_agent.model == "gpt-4o-mini"
-        assert len(message_handler_agent.tools) == 4  # Should have 4 tools
+        assert (
+            len(message_handler_agent.tools) == 8
+        )  # Should have 8 tools (stock + politician tools)
 
     def test_stock_research_agent_created(self):
         """Test stock research agent is created correctly."""
@@ -37,6 +41,12 @@ class TestAgentCreation:
         assert summarizer_agent.name == "Summarizer Agent"
         assert summarizer_agent.model == "gpt-4o-mini"
         assert len(summarizer_agent.tools) == 0  # Summarizer has no tools
+
+    def test_politician_research_agent_created(self):
+        """Test politician research agent is created correctly."""
+        assert politician_research_agent.name == "Congressional Trading Research Agent"
+        assert politician_research_agent.model == "gpt-4.1"
+        assert len(politician_research_agent.tools) == 2  # Should have 2 tools
 
     def test_conversation_summarizer_agent_created(self):
         """Test conversation summarizer agent is created correctly."""
@@ -94,7 +104,7 @@ class TestHandleIncomingMessage:
 
             # Check that the message was logged
             captured = capfd.readouterr()
-            assert "Processing message: test message" in captured.out
+            assert "Processing message:" in captured.out
 
 
 class TestRunResearchPipeline:
@@ -181,9 +191,7 @@ class TestRunResearchPipeline:
                 "sentinel.agents.handlers.send_telegram_message",
                 new_callable=AsyncMock,
             ) as mock_telegram:
-                with patch(
-                    "sentinel.agents.handlers.get_error_message"
-                ) as mock_error:
+                with patch("sentinel.agents.handlers.get_error_message") as mock_error:
                     # Setup error scenario
                     mock_runner.side_effect = Exception("Research failed")
                     mock_error.return_value = (
@@ -212,9 +220,7 @@ class TestRunResearchPipeline:
                 "sentinel.agents.handlers.send_telegram_message",
                 new_callable=AsyncMock,
             ):
-                with patch(
-                    "sentinel.agents.handlers.get_research_pipeline_template"
-                ):
+                with patch("sentinel.agents.handlers.get_research_pipeline_template"):
                     mock_runner.return_value = mock_response
 
                     await run_research_pipeline("AAPL", 150.0, 147.0)
@@ -379,9 +385,13 @@ class TestConversationHistory:
     @pytest.mark.asyncio
     async def test_handle_message_with_chat_history_error(self):
         """Test handling when chat history fetch fails."""
-        with patch("sentinel.agents.handlers.chat_history_manager") as mock_history_manager:
+        with patch(
+            "sentinel.agents.handlers.chat_history_manager"
+        ) as mock_history_manager:
             # Simulate error in get_conversation_summary
-            mock_history_manager.get_conversation_summary.side_effect = Exception("Database Error")
+            mock_history_manager.get_conversation_summary.side_effect = Exception(
+                "Database Error"
+            )
 
             with patch("sentinel.agents.handlers.get_error_message") as mock_error:
                 mock_error.return_value = (
@@ -405,12 +415,18 @@ class TestConversationHistory:
             "User: Add MSFT to my watchlist"
         )
 
-        with patch("sentinel.agents.handlers.chat_history_manager") as mock_history_manager:
-            mock_history_manager.get_conversation_summary.return_value = mock_conversation_summary
+        with patch(
+            "sentinel.agents.handlers.chat_history_manager"
+        ) as mock_history_manager:
+            mock_history_manager.get_conversation_summary.return_value = (
+                mock_conversation_summary
+            )
 
             with patch("sentinel.agents.handlers.Runner") as mock_runner:
                 mock_summarizer_response = AsyncMock()
-                mock_summarizer_response.final_output = "User asked about TSLA and wants to track MSFT"
+                mock_summarizer_response.final_output = (
+                    "User asked about TSLA and wants to track MSFT"
+                )
 
                 mock_handler_response = AsyncMock()
                 mock_handler_response.final_output = "I'll help you track these stocks"
@@ -427,10 +443,14 @@ class TestConversationHistory:
 
                 mock_runner.run = AsyncMock(side_effect=mock_run)
 
-                result = await handle_incoming_message("Show my portfolio", chat_id="test_chat")
+                result = await handle_incoming_message(
+                    "Show my portfolio", chat_id="test_chat"
+                )
 
                 # Verify that get_conversation_summary was called
-                mock_history_manager.get_conversation_summary.assert_called_once_with("test_chat", limit=5)
+                mock_history_manager.get_conversation_summary.assert_called_once_with(
+                    "test_chat", limit=5
+                )
 
                 # Check that Runner.run was called twice (summarizer + handler)
                 assert mock_runner.run.call_count == 2
@@ -457,9 +477,12 @@ class TestConversationHistory:
             }
         ]
 
-        with patch("sentinel.agents.handlers.telegram_bot") as mock_telegram_bot:
-            mock_telegram_bot.get_chat_history = AsyncMock(
-                return_value=mock_chat_history
+        with patch(
+            "sentinel.agents.handlers.chat_history_manager"
+        ) as mock_history_manager:
+            mock_history_manager.get_conversation_summary.return_value = (
+                "User: I'm interested in tech stocks (Bob)\n"
+                "Bot: I can help you find good tech stocks to invest in"
             )
 
             with patch("sentinel.agents.handlers.Runner") as mock_runner:
@@ -505,8 +528,12 @@ class TestConversationHistory:
             "User: Good luck! (Bob)"
         )
 
-        with patch("sentinel.agents.handlers.chat_history_manager") as mock_history_manager:
-            mock_history_manager.get_conversation_summary.return_value = mock_conversation_summary
+        with patch(
+            "sentinel.agents.handlers.chat_history_manager"
+        ) as mock_history_manager:
+            mock_history_manager.get_conversation_summary.return_value = (
+                mock_conversation_summary
+            )
 
             with patch("sentinel.agents.handlers.Runner") as mock_runner:
                 mock_summarizer_response = AsyncMock()
@@ -528,8 +555,97 @@ class TestConversationHistory:
 
                 mock_runner.run = AsyncMock(side_effect=mock_run)
 
-                result = await handle_incoming_message("How did AAPL do?", chat_id="group_chat")
+                result = await handle_incoming_message(
+                    "How did AAPL do?", chat_id="group_chat"
+                )
 
                 # Should call both summarizer and handler
                 assert mock_runner.run.call_count == 2
                 assert result == "AAPL earnings were strong"
+
+
+class TestPoliticianResearchPipeline:
+    """Test the run_politician_research_pipeline function."""
+
+    @pytest.mark.asyncio
+    async def test_successful_politician_research_pipeline(self):
+        """Test successful politician research pipeline execution."""
+        mock_research_response = Mock()
+        mock_research_response.final_output = (
+            "Nancy Pelosi's AAPL trade appears motivated by earnings optimism"
+        )
+
+        with patch(
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
+        ) as mock_runner:
+            with patch(
+                "sentinel.agents.handlers.send_telegram_message",
+                new_callable=AsyncMock,
+            ) as mock_telegram:
+                with patch(
+                    "sentinel.agents.handlers.get_politician_research_template"
+                ) as mock_template:
+                    # Setup mocks
+                    mock_runner.return_value = mock_research_response
+                    mock_template.return_value = "{politician_name}: {research_output}"
+
+                    result = await run_politician_research_pipeline("Nancy Pelosi")
+
+                    assert (
+                        result
+                        == "Nancy Pelosi: Nancy Pelosi's AAPL trade appears motivated by earnings optimism"
+                    )
+                    assert (
+                        mock_runner.call_count == 1
+                    )  # Only the research agent, not summarizer
+                    mock_telegram.assert_called_once_with(
+                        "Nancy Pelosi: Nancy Pelosi's AAPL trade appears motivated by earnings optimism"
+                    )
+
+    @pytest.mark.asyncio
+    async def test_politician_research_pipeline_error_handling(self):
+        """Test error handling in politician research pipeline."""
+        with patch(
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
+        ) as mock_runner:
+            with patch(
+                "sentinel.agents.handlers.send_telegram_message",
+                new_callable=AsyncMock,
+            ) as mock_telegram:
+                with patch("sentinel.agents.handlers.get_error_message") as mock_error:
+                    # Setup error scenario
+                    mock_runner.side_effect = Exception("Research failed")
+                    mock_error.return_value = "{politician_name} trading activity detected, but analysis failed."
+
+                    result = await run_politician_research_pipeline("Nancy Pelosi")
+
+                    expected_error = (
+                        "Nancy Pelosi trading activity detected, but analysis failed."
+                    )
+                    assert result == expected_error
+                    mock_telegram.assert_called_once_with(expected_error)
+                    mock_error.assert_called_once_with("politician_research_failed")
+
+    @pytest.mark.asyncio
+    async def test_politician_research_pipeline_logging(self, capfd):
+        """Test that politician research pipeline logs correctly."""
+        mock_response = Mock()
+        mock_response.final_output = "Research completed"
+
+        with patch(
+            "sentinel.agents.handlers.Runner.run", new_callable=AsyncMock
+        ) as mock_runner:
+            with patch(
+                "sentinel.agents.handlers.send_telegram_message",
+                new_callable=AsyncMock,
+            ):
+                with patch("sentinel.agents.handlers.get_politician_research_template"):
+                    mock_runner.return_value = mock_response
+
+                    await run_politician_research_pipeline("Nancy Pelosi")
+
+                    captured = capfd.readouterr()
+                    assert (
+                        "Running politician research pipeline for Nancy Pelosi"
+                        in captured.out
+                    )

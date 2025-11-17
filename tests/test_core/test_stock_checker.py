@@ -11,7 +11,7 @@ sys.path.append("src")
 class TestStockChecker:
     """Test stock price checking operations."""
 
-    @patch("sentinel.core.stock_checker.yf")
+    @patch("sentinel.core.stock_query.yf")
     def test_get_stock_price_success(self, mock_yf):
         """Test successful stock price retrieval."""
         from sentinel.core.stock_query import get_stock_price
@@ -56,7 +56,7 @@ class TestStockChecker:
         mock_ticker.history.assert_any_call(period="1d", interval="1m")
         mock_ticker.history.assert_any_call(period="5d")
 
-    @patch("sentinel.core.stock_checker.yf")
+    @patch("sentinel.core.stock_query.yf")
     def test_get_stock_price_ticker_error(self, mock_yf):
         """Test error handling when yfinance ticker creation fails."""
         from sentinel.core.stock_query import get_stock_price
@@ -66,7 +66,7 @@ class TestStockChecker:
         with pytest.raises(Exception, match="Network error"):
             get_stock_price("INVALID")
 
-    @patch("sentinel.core.stock_checker.yf")
+    @patch("sentinel.core.stock_query.yf")
     def test_get_stock_price_history_error(self, mock_yf):
         """Test error handling when history data is unavailable."""
         from sentinel.core.stock_query import get_stock_price
@@ -78,7 +78,7 @@ class TestStockChecker:
         with pytest.raises(Exception, match="History unavailable"):
             get_stock_price("AAPL")
 
-    @patch("sentinel.core.stock_checker.yf")
+    @patch("sentinel.core.stock_query.yf")
     def test_get_stock_price_missing_data(self, mock_yf):
         """Test handling when some data is missing."""
         from sentinel.core.stock_query import get_stock_price
@@ -124,7 +124,7 @@ class TestStockChecker:
                 current_price="invalid", previous_close=148.0  # Should be float
             )
 
-    @patch("sentinel.core.stock_checker.yf")
+    @patch("sentinel.core.stock_query.yf")
     def test_get_stock_price_empty_data_fallback(self, mock_yf):
         """Test fallback when 1-day data is empty."""
         from sentinel.core.stock_query import get_stock_price
@@ -165,7 +165,7 @@ class TestStockChecker:
         # Verify both calls were made
         assert mock_ticker.history.call_count == 2
 
-    @patch("sentinel.core.stock_checker.yf")
+    @patch("sentinel.core.stock_query.yf")
     def test_multiple_stock_calls(self, mock_yf):
         """Test multiple sequential stock price calls."""
         from sentinel.core.stock_query import get_stock_price

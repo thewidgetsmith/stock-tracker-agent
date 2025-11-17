@@ -13,6 +13,8 @@ from sentinel.agents.prompts import (
     get_agent_config,
     get_error_message,
     get_message_handler_config,
+    get_politician_research_config,
+    get_politician_research_template,
     get_research_pipeline_template,
     get_stock_research_config,
     get_summarizer_config,
@@ -135,6 +137,7 @@ def test_get_template_not_found(test_yaml_prompts):
     "config_func,expected_agent",
     [
         (get_message_handler_config, "message_handler"),
+        (get_politician_research_config, "politician_research"),
         (get_stock_research_config, "stock_research"),
         (get_summarizer_config, "summarizer"),
     ],
@@ -154,6 +157,7 @@ def test_convenience_config_functions(config_func, expected_agent):
     "error_type,expected_template",
     [
         ("general_error", "error_messages.general_error"),
+        ("politician_research_failed", "error_messages.politician_research_failed"),
         ("research_failed", "error_messages.research_failed"),
     ],
 )
@@ -177,6 +181,17 @@ def test_get_research_pipeline_template():
 
         mock_get_template.assert_called_once_with("research_pipeline_message")
         assert result == "Pipeline template"
+
+
+def test_get_politician_research_template():
+    """Test getting politician research pipeline template."""
+    with patch("sentinel.agents.prompts.get_template") as mock_get_template:
+        mock_get_template.return_value = "Politician pipeline template"
+
+        result = get_politician_research_template()
+
+        mock_get_template.assert_called_once_with("politician_research_message")
+        assert result == "Politician pipeline template"
 
 
 def test_cache_functionality():

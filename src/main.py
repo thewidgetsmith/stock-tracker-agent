@@ -23,6 +23,7 @@ from sentinel.config.logging import get_logger
 from sentinel.config.settings import get_settings
 from sentinel.core.stock_query import get_stock_price
 from sentinel.scheduler import (
+    add_politician_tracking_job,
     add_stock_tracking_job,
     list_scheduled_jobs,
     shutdown_scheduler,
@@ -110,9 +111,10 @@ def main() -> None:
             logger.info("Starting test mode", interval_minutes=1)
             print("Starting test mode with 1-minute stock tracking...")
 
-            # Start scheduler and add stock tracking job
+            # Start scheduler and add tracking jobs
             start_scheduler()
             add_stock_tracking_job(interval_minutes=1)
+            add_politician_tracking_job(hour=9)  # Daily at 9 AM UTC
             list_scheduled_jobs()
 
             try:
@@ -133,9 +135,10 @@ def main() -> None:
         )
         print("Starting Sentinel in production mode...")
 
-        # Start scheduler and add stock tracking job
+        # Start scheduler and add tracking jobs
         start_scheduler()
         add_stock_tracking_job(interval_minutes=settings.tracking_interval_minutes)
+        add_politician_tracking_job(hour=9)  # Daily at 9 AM UTC
         list_scheduled_jobs()
 
         # Start the FastAPI server

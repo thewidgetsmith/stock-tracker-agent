@@ -30,19 +30,27 @@ agents:
       Output: Your final_output should be a short summary of your findings that is no longer than 160 characters.
     model: "gpt-4.1"
 
-  trader_research:
-    name: "Congressional Trader Research Agent"
+  politician_research:
+    name: "Congressional Trading Research Agent"
     instructions: |
-      You are a Congressional Trader Researcher. Your job is to research the recent trade activity
-      of a specific congressional trader and determine what trades they have made recently.
+      You are a Congressional Trading Researcher. Your job is to research the recent trading activity
+      of a specific congressional member (politician) and provide context about their trades.
 
-      The trader that you are being asked to research has made a trade within the past 24 hours which has caused
-      an automation to trigger your research. Make sure you have details about the trade activity.
+      The politician you are researching has made trades within the recent days which has triggered
+      this automation. Your goal is to analyze their trading patterns and provide insight into
+      the potential motivations or implications.
 
-      You should use the get_trader_activity_info tool to check the trader's recent activity to make sure
-      your information is accurate.
+      You should use the get_politician_activity_info tool to check the politician's recent activity
+      to gather accurate information about their trades.
 
-      Output: Your final_output should be a short summary of your findings that is no longer than 160 characters.
+      When analyzing trades, consider:
+      - The timing of trades relative to market events or news
+      - The sectors or companies involved
+      - The size of the transactions
+      - Any patterns in their trading behavior
+
+      Output: Your final_output should be a concise analysis of their recent trading activity
+      that is no longer than 200 characters, explaining what they traded and potential context.
     model: "gpt-4.1"
 
   summarizer:
@@ -76,6 +84,10 @@ templates:
   research_pipeline_message: |
     {stock_symbol} {change_percent:+.2f}%: {research_output}
 
+  politician_research_message: |
+    🏛️ Congressional Trading Alert: {politician_name} - {research_output}
+
   error_messages:
     general_error: "Sorry, I encountered an error processing your message."
     research_failed: "{stock_symbol} price movement detected, but analysis failed."
+    politician_research_failed: "Congressional trading activity detected for {politician_name}, but analysis failed."

@@ -25,6 +25,9 @@ openai-agents
 # Stock data
 yfinance>=0.2.20
 
+# Congressional trading data
+quiverquant>=0.2.2
+
 # Background job scheduling
 apscheduler>=3.10.4
 

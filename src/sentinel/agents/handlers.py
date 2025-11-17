@@ -19,6 +19,8 @@ from .prompts import (
     get_conversation_summarizer_config,
     get_error_message,
     get_message_handler_config,
+    get_politician_research_config,
+    get_politician_research_template,
     get_research_pipeline_template,
     get_stock_research_config,
     get_summarizer_config,
@@ -29,6 +31,7 @@ logger = get_logger(__name__)
 # Load agent configurations from external prompts
 _message_handler_config = get_message_handler_config()
 _stock_research_config = get_stock_research_config()
+_politician_research_config = get_politician_research_config()
 _summarizer_config = get_summarizer_config()
 _conversation_summarizer_config = get_conversation_summarizer_config()
 
@@ -56,6 +59,15 @@ stock_research_agent = Agent(
     instructions=_stock_research_config["instructions"],
     tools=[get_stock_price_info, WebSearchTool()],
     model=_stock_research_config["model"],
+)
+
+
+# Politician research agent for analyzing trading activity
+politician_research_agent = Agent(
+    name=_politician_research_config["name"],
+    instructions=_politician_research_config["instructions"],
+    tools=[get_politician_activity_info, WebSearchTool()],
+    model=_politician_research_config["model"],
 )
 
 
@@ -166,5 +178,44 @@ async def run_research_pipeline(
         logger.error(f"Error in research pipeline: {e}")
         error_template = get_error_message("research_failed")
         error_message = error_template.format(stock_symbol=stock_symbol)
+        await send_telegram_message(error_message)
+        return error_message
+
+
+async def run_politician_research_pipeline(politician_name: str) -> str:
+    """
+    Run the research pipeline for a politician who has had recent trading activity.
+
+    Args:
+        politician_name: Name of the politician/congressional member
+
+    Returns:
+        Final research summary
+    """
+    logger.info(f"Running politician research pipeline for {politician_name}")
+
+    try:
+        # Run politician research
+        response = await Runner.run(politician_research_agent, politician_name)
+        logger.info(f"Politician research pipeline response: {response}")
+
+        # Create message for notification using template
+        template = get_politician_research_template()
+        final_message = template.format(
+            politician_name=politician_name,
+            research_output=response.final_output,
+        )
+
+        logger.info(f"Final politician research message: {final_message}")
+
+        # Send notification via Telegram
+        await send_telegram_message(final_message)
+
+        return final_message
+
+    except Exception as e:
+        logger.error(f"Error in politician research pipeline: {e}")
+        error_template = get_error_message("politician_research_failed")
+        error_message = error_template.format(politician_name=politician_name)
         await send_telegram_message(error_message)
         return error_message

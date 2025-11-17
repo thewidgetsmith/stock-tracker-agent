@@ -49,12 +49,12 @@ def isolated_db():
 def mock_db_session(isolated_db):
     """Mock database session to use isolated test database."""
     with patch(
-        "sentinel.db.database.get_session_factory",
+        "sentinel.ormdb.database.get_session_factory",
         lambda: isolated_db["session_factory"],
     ):
-        with patch("sentinel.db.database.get_engine", lambda: isolated_db["engine"]):
+        with patch("sentinel.ormdb.database.get_engine", lambda: isolated_db["engine"]):
             with patch(
-                "sentinel.db.database.get_session_sync",
+                "sentinel.ormdb.database.get_session_sync",
                 lambda: isolated_db["session_factory"](),
             ):
                 yield isolated_db["session_factory"]()

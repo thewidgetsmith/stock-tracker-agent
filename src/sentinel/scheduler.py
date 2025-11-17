@@ -1,5 +1,6 @@
 """Scheduler configuration using SQLAlchemy job store."""
 
+import asyncio
 import os
 
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
@@ -121,6 +122,34 @@ def add_stock_tracking_job(interval_minutes: int = 60):
     )
 
     print(f"Added stock tracking job with {interval_minutes} minute interval")
+
+
+def add_politician_tracking_job(hour: int = 9):
+    """
+    Add the politician tracking job to the scheduler.
+
+    Args:
+        hour: Hour of the day to run (default: 9 AM UTC)
+    """
+    scheduler = get_global_scheduler()
+
+    # Remove existing job if it exists
+    try:
+        scheduler.remove_job("politician_tracking")
+    except:
+        pass  # Job doesn't exist, which is fine
+
+    # Add the job to run daily at specified hour using module reference
+    scheduler.add_job(
+        func="sentinel.core.politician_tracker:run_politician_tracking_sync",
+        trigger="cron",
+        hour=hour,
+        id="politician_tracking",
+        name="Politician Trading Tracking",
+        replace_existing=True,
+    )
+
+    print(f"Added politician tracking job to run daily at {hour}:00 UTC")
 
 
 def list_scheduled_jobs():

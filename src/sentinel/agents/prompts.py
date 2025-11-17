@@ -128,6 +128,11 @@ def get_conversation_summarizer_config() -> Dict[str, Any]:
     return get_agent_config("conversation_summarizer")
 
 
+def get_politician_research_config() -> Dict[str, Any]:
+    """Get politician research agent configuration."""
+    return get_agent_config("politician_research")
+
+
 def get_error_message(error_type: str) -> str:
     """
     Get an error message template.
@@ -144,3 +149,8 @@ def get_error_message(error_type: str) -> str:
 def get_research_pipeline_template() -> str:
     """Get the research pipeline message template."""
     return get_template("research_pipeline_message")
+
+
+def get_politician_research_template() -> str:
+    """Get the politician research message template."""
+    return get_template("politician_research_message")

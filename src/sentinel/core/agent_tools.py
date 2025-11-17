@@ -33,7 +33,9 @@ async def add_alert_to_history_impl(
         return f"Added alert for {symbol.upper()} on {alert_date}"
 
 
-async def add_politician_to_tracker_impl(name: str, chamber: Optional[str] = None) -> str:
+async def add_politician_to_tracker_impl(
+    name: str, chamber: Optional[str] = None
+) -> str:
     """Add a politician to the tracking list - implementation."""
     with TrackedPoliticianRepository() as repo:
         # Check if politician is already tracked
@@ -67,41 +69,47 @@ async def check_alert_history_impl(symbol: str) -> List[str]:
         return alert_dates
 
 
-async def get_politician_activity_info_impl(name: str, fetch_latest: bool = False) -> List[str]:
+async def get_politician_activity_info_impl(
+    name: str, fetch_latest: bool = False
+) -> List[str]:
     """Get trade activity for a specific politician - implementation."""
     # If requested, fetch latest data from API first
     if fetch_latest:
         try:
             # Import here to avoid circular imports
-            from ..services.congressional_service import CongressionalService
             from ..config.settings import get_settings
-            
+            from ..services.congressional_service import CongressionalService
+
             settings = get_settings()
-            if hasattr(settings, 'quiver_api_token') and settings.quiver_api_token:
+            if hasattr(settings, "quiver_api_token") and settings.quiver_api_token:
                 service = CongressionalService(settings.quiver_api_token)
-                await service.get_congressional_trades(representative=name, days_back=30, save_to_db=True)
+                await service.get_congressional_trades(
+                    representative=name, days_back=30, save_to_db=True
+                )
                 logger.info(f"Fetched latest data for {name} from Quiver API")
             else:
-                logger.warning("Quiver API token not configured, using database data only")
+                logger.warning(
+                    "Quiver API token not configured, using database data only"
+                )
         except Exception as e:
             logger.error(f"Failed to fetch latest data for {name}: {e}")
-    
+
     # Get activities from database
     with PoliticianActivityRepository() as activity_repo:
         activities = activity_repo.get_activities_by_politician(name)
-        
+
     if not activities:
         return [f"No trading activity found for {name}"]
-    
+
     activity_summaries = []
     for activity in activities[:10]:  # Show latest 10
-        date_str = activity.activity_date.strftime('%Y-%m-%d')
+        date_str = activity.activity_date.strftime("%Y-%m-%d")
         summary = f"{activity.activity_type} {activity.ticker} ({activity.amount_range}) on {date_str}"
         activity_summaries.append(summary)
-        
+
     if len(activities) > 10:
         activity_summaries.append(f"... and {len(activities) - 10} more activities")
-    
+
     return activity_summaries
 
 
@@ -115,14 +123,14 @@ async def get_tracked_politicians_list_impl() -> List[str]:
     try:
         with TrackedPoliticianRepository() as repo:
             tracked_politicians = repo.get_all_tracked_politicians()
-            
+
         names = []
         for tracked in tracked_politicians:
             # Access the politician name through the relationship
-            if hasattr(tracked, 'politician') and tracked.politician:
+            if hasattr(tracked, "politician") and tracked.politician:
                 names.append(tracked.politician.name)
-        
-        logger.info("Getting politician tracker list:", names=names)
+
+        logger.info("Getting politician tracker list", names=names)
         return names
     except Exception as e:
         logger.error(f"Error getting tracked politicians: {e}")
@@ -133,7 +141,7 @@ async def get_tracked_stocks_list_impl() -> List[str]:
     """Get the current list of tracked stocks - implementation."""
     with TrackedStockRepository() as repo:
         symbols = repo.get_stock_symbols()
-        logger.info("Getting tracker list:", symbols)
+        logger.info("Getting tracker list", symbols=symbols)
         return symbols
 
 
@@ -185,7 +193,9 @@ async def check_alert_history(symbol: str) -> List[str]:
 
 
 @function_tool
-async def get_politician_activity_info(name: str, fetch_latest: bool = False) -> List[str]:
+async def get_politician_activity_info(
+    name: str, fetch_latest: bool = False
+) -> List[str]:
     """Get trade activity for a specific politician."""
     return await get_politician_activity_info_impl(name, fetch_latest)
 
