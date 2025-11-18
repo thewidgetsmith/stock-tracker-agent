@@ -176,3 +176,31 @@ def run_politician_tracking_sync():
         logger.info("Politician tracking job completed successfully")
     except Exception as e:
         logger.error(f"Error in politician tracking job: {e}")
+
+
+def run_politician_research_sync(politician_name: str):
+    """
+    Synchronous wrapper for running research on a specific politician.
+
+    This function is used by the scheduler to run individual research jobs.
+    """
+    import asyncio
+
+    try:
+        # Run the async research pipeline
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Fetch latest trades first
+        loop.run_until_complete(fetch_politician_trades(politician_name))
+        
+        # Run research pipeline
+        loop.run_until_complete(run_politician_research_pipeline(politician_name))
+        
+        # Mark activities as analyzed
+        loop.run_until_complete(mark_activities_analyzed(politician_name))
+        
+        loop.close()
+        logger.info(f"Politician research job for {politician_name} completed successfully")
+    except Exception as e:
+        logger.error(f"Error in politician research job for {politician_name}: {e}")

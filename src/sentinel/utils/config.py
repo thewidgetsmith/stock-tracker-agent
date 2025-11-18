@@ -81,8 +81,8 @@ def load_config() -> Dict[str, Any]:
         "telegram_chat_id": settings.telegram_chat_id,
         "openai_api_key": settings.openai_api_key,
         "webhook_url": settings.telegram_webhook_url,
-        "host": settings.endpoint_host,
-        "port": settings.endpoint_port,
+        "host": settings.fastapi_host,
+        "port": settings.fastapi_port,
     }
 
 

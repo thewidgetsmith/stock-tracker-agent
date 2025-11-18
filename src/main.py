@@ -78,7 +78,7 @@ def main() -> None:
             "TELEGRAM_CHAT_ID",
             "TELEGRAM_AUTH_TOKEN",
             "OPENAI_API_KEY",
-            "ENDPOINT_AUTH_TOKEN",
+            "FASTAPI_AUTH_TOKEN",
         ]
         print(f"Required variables: {', '.join(required_vars)}")
         sys.exit(1)
@@ -130,8 +130,8 @@ def main() -> None:
         logger.info(
             "Starting production mode",
             interval_minutes=settings.tracking_interval_minutes,
-            host=settings.endpoint_host,
-            port=settings.endpoint_port,
+            host=settings.fastapi_host,
+            port=settings.fastapi_port,
         )
         print("Starting Sentinel in production mode...")
 
@@ -145,10 +145,10 @@ def main() -> None:
         try:
             uvicorn.run(
                 "sentinel.webapi.app:app",
-                host=settings.endpoint_host,
-                port=settings.endpoint_port,
-                reload=settings.api_reload,  # Use configured reload setting
-                log_level=settings.api_log_level.lower(),
+                log_level=settings.fastapi_log_level.lower(),
+                reload=settings.fastapi_reload,  # Use configured reload setting
+                port=settings.fastapi_port,
+                host=settings.fastapi_host,
             )
         except KeyboardInterrupt:
             logger.info("Received interrupt signal")

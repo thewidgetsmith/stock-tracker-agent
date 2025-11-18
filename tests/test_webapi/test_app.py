@@ -19,7 +19,7 @@ class TestFastAPIApp:
     def env_vars(self):
         """Setup environment variables for testing."""
         test_env = {
-            "ENDPOINT_AUTH_TOKEN": "s9oH9wtK0fgJUHbMfcRAyu1p4I7zkpvI",  # Use the actual token from .env
+            "FASTAPI_AUTH_TOKEN": "s9oH9wtK0fgJUHbMfcRAyu1p4I7zkpvI",  # Use the actual token from .env
             "TELEGRAM_AUTH_TOKEN": "aRz1a7orEnSj9b15PTKOLy4aKRqkFxGD",  # Use the actual token from .env
             "TELEGRAM_CHAT_ID": "7796373477",  # Use the actual chat ID from .env
         }
@@ -109,7 +109,7 @@ class TestFastAPIApp:
     # Authentication Function Tests
 
     def test_verify_auth_token_no_env_var(self):
-        """Test auth verification when ENDPOINT_AUTH_TOKEN is not set."""
+        """Test auth verification when FASTAPI_AUTH_TOKEN is not set."""
         with patch.dict(os.environ, {}, clear=True):
             # Test through the actual app endpoint instead of the function directly
             from sentinel.webapi.app import create_app

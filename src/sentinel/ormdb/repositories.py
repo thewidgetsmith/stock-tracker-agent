@@ -322,6 +322,49 @@ class PoliticianProfileRepository:
             return True
         return False
 
+    def is_data_stale(self, name: str, hours: int = 12) -> bool:
+        """
+        Check if politician trading data is stale (older than specified hours).
+        
+        Args:
+            name: Name of the politician
+            hours: Number of hours to consider data stale (default: 12)
+            
+        Returns:
+            True if data is stale or has never been checked, False if fresh
+        """
+        politician = self.get_politician_by_name(name)
+        if not politician or not getattr(politician, 'last_trade_check', None):
+            return True  # No data or never checked
+            
+        from datetime import datetime, timedelta, timezone
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+        
+        # Ensure both timestamps are timezone-aware for comparison
+        last_check = politician.last_trade_check
+        if last_check.tzinfo is None:
+            last_check = last_check.replace(tzinfo=timezone.utc)
+            
+        return last_check < cutoff_time
+
+    def update_last_trade_check(self, name: str) -> bool:
+        """
+        Update the last_trade_check timestamp for a politician.
+        
+        Args:
+            name: Name of the politician
+            
+        Returns:
+            True if updated successfully, False otherwise
+        """
+        politician = self.get_politician_by_name(name)
+        if politician:
+            from datetime import datetime, timezone
+            politician.last_trade_check = datetime.now(timezone.utc)
+            self.session.commit()
+            return True
+        return False
+
 
 class PoliticianActivityRepository:
     """Repository for politician activity operations."""

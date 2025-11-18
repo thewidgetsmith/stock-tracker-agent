@@ -125,6 +125,10 @@ class CongressionalService:
             # Save trades to database if requested
             if save_to_db and trades:
                 await self._save_trades_to_db(trades)
+            elif save_to_db and representative:
+                # Even if no trades found, update last_trade_check for the specific politician
+                with PoliticianProfileRepository() as profile_repo:
+                    profile_repo.update_last_trade_check(representative)
 
             self.logger.info(
                 "Congressional trades fetched successfully",
@@ -423,6 +427,7 @@ class CongressionalService:
         """Save trades to database."""
         try:
             with PoliticianActivityRepository() as activity_repo:
+                politicians_updated = set()
                 for trade in trades:
                     # Determine chamber based on source
                     chamber = "House" if trade.source == "House" else "Senate"
@@ -439,10 +444,17 @@ class CongressionalService:
                         report_date=trade.report_date,
                         asset_description=trade.asset_description,
                     )
+                    politicians_updated.add(trade.representative)
+
+            # Update last_trade_check timestamp for all politicians whose data was fetched
+            with PoliticianProfileRepository() as profile_repo:
+                for politician_name in politicians_updated:
+                    profile_repo.update_last_trade_check(politician_name)
 
             self.logger.info(
                 "Saved congressional trades to database",
                 trade_count=len(trades),
+                politicians_updated=len(politicians_updated),
             )
 
         except Exception as e:
@@ -462,7 +474,9 @@ class CongressionalService:
         """Add a congressional member to the tracking list."""
         try:
             with TrackedPoliticianRepository() as tracked_repo:
-                tracked_repo.add_tracked_politician(member_name, chamber, alert_preferences)
+                tracked_repo.add_tracked_politician(
+                    member_name, chamber, alert_preferences
+                )
 
             self.logger.info(
                 "Added congressional member to tracking",
@@ -516,7 +530,7 @@ class CongressionalService:
 
             member_names = []
             for tracked in tracked_politicians:
-                if hasattr(tracked, 'politician') and tracked.politician:
+                if hasattr(tracked, "politician") and tracked.politician:
                     member_names.append(tracked.politician.name)
 
             return member_names
@@ -535,7 +549,9 @@ class CongressionalService:
         """Get recent trades for a member from the database."""
         try:
             with PoliticianActivityRepository() as activity_repo:
-                activities = activity_repo.get_recent_activities_by_politician(member_name, days)
+                activities = activity_repo.get_recent_activities_by_politician(
+                    member_name, days
+                )
 
             recent_trades = [
                 {

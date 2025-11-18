@@ -15,41 +15,23 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
 
-    # Telegram settings
-    telegram_bot_token: Optional[str] = None
-    telegram_chat_id: Optional[str] = None
-    telegram_auth_token: Optional[str] = None
-    telegram_webhook_url: Optional[str] = None
-
-    # AI settings
-    openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-4o-mini"
-    openai_research_model: str = "gpt-4.1"
-    openai_max_tokens: int = 4000
-    openai_temperature: float = 0.7
-
-    # External API settings
-    quiver_api_token: Optional[str] = None  # For congressional trading data
-
-    # Tracking settings
-    tracking_interval_minutes: int = 60
-    price_change_threshold: float = 0.01
-    max_tracked_stocks: int = 50
-    alert_cooldown_hours: int = 24
-
-    # API settings
-    endpoint_host: str = "0.0.0.0"
-    endpoint_port: int = 8000
-    endpoint_auth_token: Optional[str] = None
-    api_reload: bool = False
-    api_log_level: str = "INFO"
-
     # Database settings
     database_url: Optional[str] = None
     data_directory: str = "data"
     database_echo_sql: bool = False
     database_pool_pre_ping: bool = True
     database_pool_recycle: int = 3600
+
+    # External API settings
+    finnhub_api_token: Optional[str] = None
+    quiver_api_token: Optional[str] = None
+
+    # FastAPI settings
+    fastapi_auth_token: Optional[str] = None
+    fastapi_log_level: str = "INFO"
+    fastapi_reload: bool = False
+    fastapi_host: str = "0.0.0.0"
+    fastapi_port: int = 8000
 
     # Logging settings
     log_level: str = "INFO"
@@ -58,6 +40,25 @@ class Settings(BaseSettings):
     log_file_path: str = "data/sentinel.log"
     log_max_file_size: str = "10MB"
     log_backup_count: int = 5
+
+    # OpenAI settings
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4o-mini"
+    openai_research_model: str = "gpt-4.1"
+    openai_max_tokens: int = 4000
+    openai_temperature: float = 0.7
+
+    # Telegram settings
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+    telegram_auth_token: Optional[str] = None
+    telegram_webhook_url: Optional[str] = None
+
+    # Tracker settings
+    alert_cooldown_hours: int = 24
+    max_tracked_stocks: int = 50
+    price_change_threshold: float = 0.01
+    tracking_interval_minutes: int = 60
 
     model_config = {
         "env_file": ".env",
@@ -79,7 +80,9 @@ class Settings(BaseSettings):
     @classmethod
     def validate_chat_id(cls, v):
         """Validate that chat_id is numeric (Telegram chat IDs are numeric)."""
-        if not v.lstrip("-").isdigit():
+        if v is None:
+            return v  # Allow None values
+        if not str(v).lstrip("-").isdigit():
             raise ValueError("chat_id must be numeric")
         return v
 
@@ -87,6 +90,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_api_key(cls, v):
         """Validate OpenAI API key format."""
+        if v is None:
+            return v  # Allow None values
         if not v.startswith(("sk-", "sk-proj-")):
             raise ValueError("Invalid OpenAI API key format")
         return v
@@ -107,7 +112,7 @@ class Settings(BaseSettings):
             raise ValueError("Price change threshold must be between 0 and 1 (0-100%)")
         return v
 
-    @field_validator("endpoint_port")
+    @field_validator("fastapi_port")
     @classmethod
     def validate_port(cls, v):
         """Validate port number is in valid range."""
@@ -115,7 +120,7 @@ class Settings(BaseSettings):
             raise ValueError("Port must be between 1 and 65535")
         return v
 
-    @field_validator("log_level", "api_log_level")
+    @field_validator("log_level", "fastapi_log_level")
     @classmethod
     def validate_log_level(cls, v):
         """Validate log level."""
@@ -136,7 +141,17 @@ class Settings(BaseSettings):
     def get_database_url(self) -> str:
         """Get the complete database URL."""
         if self.database_url:
-            return self.database_url
+            # If database_url is a full URL, return as is
+            if "://" in self.database_url:
+                return self.database_url
+
+            # If it's just a filename, treat it as SQLite in data directory
+            from pathlib import Path
+
+            db_dir = Path(self.data_directory)
+            db_dir.mkdir(exist_ok=True)
+            db_path = db_dir / self.database_url
+            return f"sqlite:///{db_path}"
 
         # Default to SQLite in data directory
         from pathlib import Path
@@ -184,7 +199,7 @@ def validate_required_settings() -> bool:
         _ = settings.telegram_bot_token
         _ = settings.telegram_chat_id
         _ = settings.openai_api_key
-        _ = settings.endpoint_auth_token
+        _ = settings.fastapi_auth_token
 
         return True
 
@@ -205,5 +220,5 @@ def get_required_env_vars() -> list[str]:
         "TELEGRAM_CHAT_ID",
         "TELEGRAM_AUTH_TOKEN",
         "OPENAI_API_KEY",
-        "ENDPOINT_AUTH_TOKEN",
+        "FASTAPI_AUTH_TOKEN",
     ]

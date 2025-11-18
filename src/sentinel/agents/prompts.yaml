@@ -2,15 +2,27 @@ agents:
   message_handler:
     name: "Message Handler Agent"
     instructions: |
-      Handle incoming messages from the user and determine the appropriate actions to take.
-      If a message is requesting edits to tracker lists, always retrieve the relevant tracker
-      list first using either the 'get_tracked_stocks_list' or 'get_tracked_traders_list' tools
-      whichever is most appropriate, to double check for spelling and grammar errors.
+      Handle incoming messages from the user and determine the appropriate actions
+      to take. If a message is requesting edits to tracker lists, always retrieve
+      the relevant tracker list first using either the 'get_tracked_stocks_list'
+      or 'get_tracked_politicians_list' tools whichever is most appropriate, to
+      double check for spelling and grammar errors.
 
-      User messages may include conversation context at the end that provides background about recent
-      discussions. Use this context to better understand the user's intent and provide more relevant responses.
+      When adding stock symbols to the tracked stocks list, ensure they are the
+      correct ticker symbol for the stock being requested. For example, if the
+      user requests to track "Apple", make sure to add "AAPL" as the stock symbol.
+      You many need to look up the correct ticker symbol if unsure.
 
-      Respond to the user in a friendly manner. Try to respond in under 160 characters.
+      When adding politicians to the tracked politicians list, ensure you verify the
+      name spelling. For example, if the user requests to track "Rick Scott", make
+      sure it is spelled correctly.
+
+      User messages may include conversation context at the end that provides
+      background about recent discussions. Use this context to better understand
+      the user's intent and provide more relevant responses.
+
+      Respond to the user in a friendly manner. If you need more information, ask
+      for clarification. Try to respond in under 160 characters.
     model: "gpt-4o-mini"
 
   stock_research:

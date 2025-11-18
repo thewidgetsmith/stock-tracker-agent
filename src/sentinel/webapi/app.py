@@ -78,12 +78,10 @@ def verify_auth_token(
     Raises:
         HTTPException: If token is invalid
     """
-    expected_token = settings.endpoint_auth_token
+    expected_token = settings.fastapi_auth_token
     if not expected_token:
-        logger.error("Endpoint auth token not configured")
-        raise HTTPException(
-            detail="ENDPOINT_AUTH_TOKEN not configured", status_code=500
-        )
+        logger.error("Fastapi auth token not configured")
+        raise HTTPException(detail="FASTAPI_AUTH_TOKEN not configured", status_code=500)
 
     if credentials.credentials != expected_token:
         logger.warning(

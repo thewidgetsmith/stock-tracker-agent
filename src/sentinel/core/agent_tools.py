@@ -73,8 +73,12 @@ async def get_politician_activity_info_impl(
     name: str, fetch_latest: bool = False
 ) -> List[str]:
     """Get trade activity for a specific politician - implementation."""
-    # If requested, fetch latest data from API first
-    if fetch_latest:
+    # Check if data is stale (more than 12 hours old) or doesn't exist
+    with PoliticianProfileRepository() as profile_repo:
+        is_stale = profile_repo.is_data_stale(name, hours=12)
+
+    # If data is stale or does not exist, fetch latest and trigger research
+    if is_stale or fetch_latest:
         try:
             # Import here to avoid circular imports
             from ..config.settings import get_settings
@@ -83,10 +87,25 @@ async def get_politician_activity_info_impl(
             settings = get_settings()
             if hasattr(settings, "quiver_api_token") and settings.quiver_api_token:
                 service = CongressionalService(settings.quiver_api_token)
-                await service.get_congressional_trades(
+                trades = await service.get_congressional_trades(
                     representative=name, days_back=30, save_to_db=True
                 )
-                logger.info(f"Fetched latest data for {name} from Quiver API")
+                logger.info(
+                    f"Fetched latest data for {name} from Quiver API - found {len(trades)} trades"
+                )
+
+                # If data was stale and we found new trades, trigger research
+                if is_stale and trades:
+                    try:
+                        from ..scheduler import trigger_politician_research_job
+
+                        job_result = trigger_politician_research_job(name)
+                        logger.info(f"Triggered research job for {name}: {job_result}")
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to trigger research job for {name}: {e}"
+                        )
+
             else:
                 logger.warning(
                     "Quiver API token not configured, using database data only"
@@ -99,7 +118,43 @@ async def get_politician_activity_info_impl(
         activities = activity_repo.get_activities_by_politician(name)
 
     if not activities:
-        return [f"No trading activity found for {name}"]
+        # If no data exists, trigger research to create it
+        if not fetch_latest:  # Avoid double triggering
+            try:
+                from ..scheduler import trigger_politician_research_job
+
+                job_result = trigger_politician_research_job(name)
+                logger.info(
+                    f"No data found for {name}, triggered research job: {job_result}"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to trigger research job for {name}: {e}")
+        return [
+            f"No trading activity found for {name}. Research job has been triggered to gather data."
+        ]
+
+    # Check data freshness and inform user
+    with PoliticianProfileRepository() as profile_repo:
+        politician = profile_repo.get_politician_by_name(name)
+        data_age_info = ""
+        if politician and getattr(politician, "last_trade_check", None):
+            import datetime as dt
+
+            last_check = politician.last_trade_check
+
+            # Ensure both timestamps are timezone-aware for comparison
+            if last_check.tzinfo is None:
+                last_check = last_check.replace(tzinfo=dt.timezone.utc)
+
+            hours_old = (
+                dt.datetime.now(dt.timezone.utc) - last_check
+            ).total_seconds() / 3600
+            if hours_old > 12:
+                data_age_info = (
+                    f" (Data is {hours_old:.1f} hours old - refresh triggered)"
+                )
+            else:
+                data_age_info = f" (Data updated {hours_old:.1f} hours ago)"
 
     activity_summaries = []
     for activity in activities[:10]:  # Show latest 10
@@ -109,6 +164,10 @@ async def get_politician_activity_info_impl(
 
     if len(activities) > 10:
         activity_summaries.append(f"... and {len(activities) - 10} more activities")
+
+    # Add data freshness info to the first item
+    if activity_summaries and data_age_info:
+        activity_summaries[0] = activity_summaries[0] + data_age_info
 
     return activity_summaries
 

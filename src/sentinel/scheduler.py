@@ -152,6 +152,44 @@ def add_politician_tracking_job(hour: int = 9):
     print(f"Added politician tracking job to run daily at {hour}:00 UTC")
 
 
+def trigger_politician_research_job(politician_name: str) -> str:
+    """
+    Trigger an immediate research job for a specific politician.
+    
+    Args:
+        politician_name: Name of the politician to research
+        
+    Returns:
+        Job ID if scheduled successfully, None if error
+    """
+    try:
+        import uuid
+        from .config.settings import get_settings
+        
+        settings = get_settings()
+        if not settings.quiver_api_token:
+            return f"Cannot trigger research for {politician_name}: Quiver API token not configured"
+        
+        scheduler = get_global_scheduler()
+        
+        # Create unique job ID
+        job_id = f"politician_research_{politician_name.replace(' ', '_').lower()}_{uuid.uuid4().hex[:8]}"
+        
+        # Add immediate job
+        scheduler.add_job(
+            func="sentinel.core.politician_tracker:run_politician_research_sync",
+            args=[politician_name],
+            id=job_id,
+            name=f"Research: {politician_name}",
+            replace_existing=False,
+        )
+        
+        return f"Triggered research job for {politician_name} (ID: {job_id})"
+        
+    except Exception as e:
+        return f"Failed to trigger research for {politician_name}: {str(e)}"
+
+
 def list_scheduled_jobs():
     """List all currently scheduled jobs."""
     scheduler = get_global_scheduler()
