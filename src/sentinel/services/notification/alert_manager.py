@@ -1,65 +1,22 @@
-"""Alert service for managing stock alerts and notifications."""
+"""Alert management and history tracking."""
 
-from dataclasses import dataclass
 from datetime import date, datetime
-from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from ..config.logging import get_logger
-from ..ormdb.database import get_session
-from ..ormdb.repositories import AlertHistoryRepository
-from .stock_service import StockAnalysis
+from ...config.logging import get_logger
+from ...ormdb.database import get_session
+from ...ormdb.repositories import AlertHistoryRepository
+from ..stock_tracking import StockAnalysis
+from .models import Alert, AlertHistory, AlertSeverity, AlertType
 
 logger = get_logger(__name__)
 
 
-class AlertType(Enum):
-    """Types of stock alerts."""
-
-    PRICE_MOVEMENT = "price_movement"
-    DAILY_SUMMARY = "daily_summary"
-    THRESHOLD_BREACH = "threshold_breach"
-    VOLUME_SPIKE = "volume_spike"
-    CUSTOM = "custom"
-
-
-class AlertSeverity(Enum):
-    """Alert severity levels."""
-
-    INFO = "info"
-    WARNING = "warning"
-    CRITICAL = "critical"
-
-
-@dataclass
-class Alert:
-    """Alert data container."""
-
-    symbol: str
-    alert_type: AlertType
-    severity: AlertSeverity
-    title: str
-    message: str
-    timestamp: datetime
-    metadata: Optional[Dict[str, Any]] = None
-
-
-@dataclass
-class AlertHistory:
-    """Alert history record."""
-
-    symbol: str
-    alert_date: str
-    alert_type: str
-    message_content: Optional[str]
-    created_at: datetime
-
-
-class AlertService:
-    """Service for alert management and history tracking."""
+class AlertManager:
+    """Manages alert creation and history tracking."""
 
     def __init__(self):
-        self.logger = logger.bind(service="alert_service")
+        self.logger = logger.bind(component="alert_manager")
 
     async def create_price_movement_alert(
         self, analysis: StockAnalysis, custom_message: Optional[str] = None
@@ -119,6 +76,98 @@ class AlertService:
             symbol=analysis.symbol,
             severity=severity.value,
             change_percent=analysis.price_change_percent,
+        )
+
+        return alert
+
+    async def create_daily_summary_alert(
+        self, portfolio_summary: Dict[str, Any]
+    ) -> Alert:
+        """
+        Create a daily portfolio summary alert.
+
+        Args:
+            portfolio_summary: Portfolio performance summary
+
+        Returns:
+            Alert object for daily summary
+        """
+        performance = portfolio_summary.get("performance", {})
+        portfolio = portfolio_summary.get("portfolio", {})
+
+        total_stocks = portfolio.get("total_stocks", 0)
+        avg_change = performance.get("average_change_percent", 0)
+        significant_movements = performance.get("significant_movements", 0)
+
+        # Determine severity based on portfolio performance
+        if significant_movements >= 3 or abs(avg_change) >= 0.05:
+            severity = AlertSeverity.WARNING
+        else:
+            severity = AlertSeverity.INFO
+
+        title = f"Daily Portfolio Summary - {total_stocks} stocks"
+
+        message = (
+            f"Portfolio Performance:\n"
+            f"• Total stocks: {total_stocks}\n"
+            f"• Average change: {avg_change:+.2%}\n"
+            f"• Significant movements: {significant_movements}\n"
+            f"• Positive movers: {performance.get('positive_movers', 0)}\n"
+            f"• Negative movers: {performance.get('negative_movers', 0)}"
+        )
+
+        alert = Alert(
+            symbol="PORTFOLIO",
+            alert_type=AlertType.DAILY_SUMMARY,
+            severity=severity,
+            title=title,
+            message=message,
+            timestamp=datetime.utcnow(),
+            metadata=portfolio_summary,
+        )
+
+        self.logger.info(
+            "Daily summary alert created",
+            total_stocks=total_stocks,
+            avg_change=avg_change,
+            significant_movements=significant_movements,
+        )
+
+        return alert
+
+    async def create_custom_alert(
+        self,
+        symbol: str,
+        title: str,
+        message: str,
+        severity: AlertSeverity = AlertSeverity.INFO,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Alert:
+        """
+        Create a custom alert.
+
+        Args:
+            symbol: Stock symbol
+            title: Alert title
+            message: Alert message
+            severity: Alert severity level
+            metadata: Optional metadata
+
+        Returns:
+            Custom Alert object
+        """
+        alert = Alert(
+            symbol=symbol,
+            alert_type=AlertType.CUSTOM,
+            severity=severity,
+            title=title,
+            message=message,
+            timestamp=datetime.utcnow(),
+            metadata=metadata,
+        )
+
+        self.logger.info(
+            "Custom alert created", symbol=symbol, severity=severity.value, title=title
         )
 
         return alert
@@ -273,98 +322,6 @@ class AlertService:
                 next(session_gen)
             except StopIteration:
                 pass
-
-    async def create_daily_summary_alert(
-        self, portfolio_summary: Dict[str, Any]
-    ) -> Alert:
-        """
-        Create a daily portfolio summary alert.
-
-        Args:
-            portfolio_summary: Portfolio performance summary
-
-        Returns:
-            Alert object for daily summary
-        """
-        performance = portfolio_summary.get("performance", {})
-        portfolio = portfolio_summary.get("portfolio", {})
-
-        total_stocks = portfolio.get("total_stocks", 0)
-        avg_change = performance.get("average_change_percent", 0)
-        significant_movements = performance.get("significant_movements", 0)
-
-        # Determine severity based on portfolio performance
-        if significant_movements >= 3 or abs(avg_change) >= 0.05:
-            severity = AlertSeverity.WARNING
-        else:
-            severity = AlertSeverity.INFO
-
-        title = f"Daily Portfolio Summary - {total_stocks} stocks"
-
-        message = (
-            f"Portfolio Performance:\n"
-            f"• Total stocks: {total_stocks}\n"
-            f"• Average change: {avg_change:+.2%}\n"
-            f"• Significant movements: {significant_movements}\n"
-            f"• Positive movers: {performance.get('positive_movers', 0)}\n"
-            f"• Negative movers: {performance.get('negative_movers', 0)}"
-        )
-
-        alert = Alert(
-            symbol="PORTFOLIO",
-            alert_type=AlertType.DAILY_SUMMARY,
-            severity=severity,
-            title=title,
-            message=message,
-            timestamp=datetime.utcnow(),
-            metadata=portfolio_summary,
-        )
-
-        self.logger.info(
-            "Daily summary alert created",
-            total_stocks=total_stocks,
-            avg_change=avg_change,
-            significant_movements=significant_movements,
-        )
-
-        return alert
-
-    async def create_custom_alert(
-        self,
-        symbol: str,
-        title: str,
-        message: str,
-        severity: AlertSeverity = AlertSeverity.INFO,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Alert:
-        """
-        Create a custom alert.
-
-        Args:
-            symbol: Stock symbol
-            title: Alert title
-            message: Alert message
-            severity: Alert severity level
-            metadata: Optional metadata
-
-        Returns:
-            Custom Alert object
-        """
-        alert = Alert(
-            symbol=symbol,
-            alert_type=AlertType.CUSTOM,
-            severity=severity,
-            title=title,
-            message=message,
-            timestamp=datetime.utcnow(),
-            metadata=metadata,
-        )
-
-        self.logger.info(
-            "Custom alert created", symbol=symbol, severity=severity.value, title=title
-        )
-
-        return alert
 
     async def get_alert_statistics(self) -> Dict[str, Any]:
         """

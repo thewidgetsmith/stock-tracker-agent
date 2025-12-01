@@ -11,7 +11,7 @@ from ..ormdb.repositories import (
     PoliticianActivityRepository,
     TrackedPoliticianRepository,
 )
-from ..services.congressional_service import CongressionalService
+from ..services.congressional import CongressionalService
 
 logger = get_logger(__name__)
 
@@ -190,17 +190,19 @@ def run_politician_research_sync(politician_name: str):
         # Run the async research pipeline
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        
+
         # Fetch latest trades first
         loop.run_until_complete(fetch_politician_trades(politician_name))
-        
+
         # Run research pipeline
         loop.run_until_complete(run_politician_research_pipeline(politician_name))
-        
+
         # Mark activities as analyzed
         loop.run_until_complete(mark_activities_analyzed(politician_name))
-        
+
         loop.close()
-        logger.info(f"Politician research job for {politician_name} completed successfully")
+        logger.info(
+            f"Politician research job for {politician_name} completed successfully"
+        )
     except Exception as e:
         logger.error(f"Error in politician research job for {politician_name}: {e}")

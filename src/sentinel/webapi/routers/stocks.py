@@ -12,8 +12,8 @@ from ...events import (
     StockRemovedFromTrackingEvent,
     get_event_bus,
 )
-from ...services import AlertService, NotificationService, StockService, TrackingService
-from ...services.stock_service import MovementThreshold
+from ...services import NotificationService, StockTrackingService
+from ...services.stock_tracking.service import MovementThreshold
 from ..exceptions import NotFoundError, ValidationException
 from ..models.requests import PaginationParams, StockSymbolRequest
 from ..models.responses import StatusResponse, StockDataResponse, SuccessResponse
@@ -25,19 +25,14 @@ router = APIRouter()
 
 
 # Service dependencies
-def get_stock_service() -> StockService:
-    """Dependency to get stock service instance."""
-    return StockService()
+def get_stock_tracking_service() -> StockTrackingService:
+    """Dependency to get stock tracking service instance."""
+    return StockTrackingService()
 
 
-def get_tracking_service() -> TrackingService:
-    """Dependency to get tracking service instance."""
-    return TrackingService()
-
-
-def get_alert_service() -> AlertService:
-    """Dependency to get alert service instance."""
-    return AlertService()
+def get_notification_service() -> NotificationService:
+    """Dependency to get notification service instance."""
+    return NotificationService()
 
 
 @router.get(
@@ -49,7 +44,7 @@ def get_alert_service() -> AlertService:
 async def get_stock_price(
     symbol: str,
     request: Request,
-    stock_service: StockService = Depends(get_stock_service),
+    stock_service: StockTrackingService = Depends(get_stock_tracking_service),
 ):
     """
     Get current stock price information.
@@ -109,7 +104,7 @@ async def analyze_stock_movement(
         "moderate",
         description="Movement threshold: minor, moderate, significant, major",
     ),
-    stock_service: StockService = Depends(get_stock_service),
+    stock_service: StockTrackingService = Depends(get_stock_tracking_service),
 ):
     """
     Analyze stock price movement and determine significance.
@@ -199,7 +194,7 @@ async def analyze_stock_movement(
 async def add_stock_to_tracking(
     stock_request: StockSymbolRequest,
     request: Request,
-    tracking_service: TrackingService = Depends(get_tracking_service),
+    stock_service: StockTrackingService = Depends(get_stock_tracking_service),
 ):
     """
     Add a stock to the tracking portfolio.
@@ -214,7 +209,7 @@ async def add_stock_to_tracking(
     logger.info("Add stock to tracking requested", symbol=symbol, request_id=request_id)
 
     try:
-        result = await tracking_service.add_stock_to_tracking(symbol)
+        result = await stock_service.add_stock_to_tracking(symbol)
 
         if result["success"]:
             # Publish stock added event
@@ -252,7 +247,7 @@ async def add_stock_to_tracking(
 async def remove_stock_from_tracking(
     symbol: str,
     request: Request,
-    tracking_service: TrackingService = Depends(get_tracking_service),
+    stock_service: StockTrackingService = Depends(get_stock_tracking_service),
 ):
     """
     Remove a stock from the tracking portfolio.
@@ -268,7 +263,7 @@ async def remove_stock_from_tracking(
     )
 
     try:
-        result = await tracking_service.remove_stock_from_tracking(symbol)
+        result = await stock_service.remove_stock_from_tracking(symbol)
 
         if result["success"]:
             # Publish stock removed event
@@ -304,7 +299,8 @@ async def remove_stock_from_tracking(
     description="Get the current tracking portfolio with all tracked stocks",
 )
 async def get_tracking_portfolio(
-    request: Request, tracking_service: TrackingService = Depends(get_tracking_service)
+    request: Request,
+    stock_service: StockTrackingService = Depends(get_stock_tracking_service),
 ):
     """
     Get the current tracking portfolio.
@@ -316,7 +312,7 @@ async def get_tracking_portfolio(
     logger.info("Tracking portfolio requested", request_id=request_id)
 
     try:
-        portfolio = await tracking_service.get_tracking_portfolio()
+        portfolio = await stock_service.get_tracking_portfolio()
 
         return StatusResponse.create(
             data={
@@ -342,7 +338,8 @@ async def get_tracking_portfolio(
     description="Get comprehensive portfolio summary with performance metrics",
 )
 async def get_portfolio_summary(
-    request: Request, tracking_service: TrackingService = Depends(get_tracking_service)
+    request: Request,
+    stock_service: StockTrackingService = Depends(get_stock_tracking_service),
 ):
     """
     Get comprehensive portfolio tracking summary.
@@ -354,7 +351,7 @@ async def get_portfolio_summary(
     logger.info("Portfolio summary requested", request_id=request_id)
 
     try:
-        summary = await tracking_service.get_portfolio_summary()
+        summary = await stock_service.get_portfolio_summary()
 
         return StatusResponse.create(data=summary, request_id=request_id)
 
@@ -374,7 +371,7 @@ async def get_portfolio_summary(
 async def analyze_all_tracked_stocks(
     request: Request,
     threshold: Optional[str] = Query("moderate", description="Movement threshold"),
-    tracking_service: TrackingService = Depends(get_tracking_service),
+    stock_service: StockTrackingService = Depends(get_stock_tracking_service),
 ):
     """
     Analyze all stocks in the tracking portfolio.
@@ -402,7 +399,7 @@ async def analyze_all_tracked_stocks(
     )
 
     try:
-        results = await tracking_service.track_all_stocks(movement_threshold)
+        results = await stock_service.track_all_stocks(movement_threshold)
 
         # Process results and trigger events for significant movements
         event_bus = get_event_bus()
@@ -471,7 +468,7 @@ async def get_alert_history(
     request: Request,
     symbol: Optional[str] = Query(None, description="Stock symbol to filter by"),
     days_back: int = Query(30, ge=1, le=365, description="Number of days to look back"),
-    alert_service: AlertService = Depends(get_alert_service),
+    notification_service: NotificationService = Depends(get_notification_service),
 ):
     """
     Get alert history.
@@ -491,7 +488,7 @@ async def get_alert_history(
     )
 
     try:
-        history = await alert_service.get_alert_history(symbol, days_back)
+        history = await notification_service.get_alert_history(symbol, days_back)
 
         # Convert to serializable format
         history_data = [

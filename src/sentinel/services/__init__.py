@@ -1,13 +1,15 @@
 """Service layer for business logic encapsulation."""
 
-from .alert_service import AlertService
-from .notification_service import NotificationService
-from .stock_service import StockService
-from .tracking_service import TrackingService
+from .congressional import CongressionalService
+from .notification import NotificationService
+from .penny_stock import PennyStockService
+from .speculation import SpeculationService
+from .stock_tracking import StockTrackingService
 
 __all__ = [
-    "StockService",
-    "AlertService",
-    "TrackingService",
+    "CongressionalService",
     "NotificationService",
+    "PennyStockService",
+    "SpeculationService",
+    "StockTrackingService",
 ]

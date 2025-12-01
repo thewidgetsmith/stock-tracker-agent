@@ -567,10 +567,10 @@ async def system_cleanup(
         # Cleanup alert history
         if cleanup_alerts:
             try:
-                from ...services import AlertService
+                from ...services import NotificationService
 
-                alert_service = AlertService()
-                # Note: AlertService would need a cleanup method in real implementation
+                notification_service = NotificationService()
+                # Note: NotificationService would need a cleanup method in real implementation
                 cleanup_results["tasks_completed"].append("alert_history_cleanup")
                 logger.info("Alert history cleanup completed")
             except Exception as e:

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict
 
 from ..config.logging import get_logger
-from ..services import AlertService, NotificationService, StockService, TrackingService
+from ..services import NotificationService, StockTrackingService
 from .events import (
     AlertSentEvent,
     AlertTriggeredEvent,
@@ -36,7 +36,6 @@ class StockPriceEventHandler(EventHandler):
 
     def __init__(self):
         super().__init__("stock_price_handler")
-        self.alert_service = AlertService()
         self.notification_service = NotificationService()
 
     async def handle_price_changed(self, event: StockPriceChangedEvent):
@@ -54,7 +53,7 @@ class StockPriceEventHandler(EventHandler):
                 # Create stock analysis object for alert creation
                 from datetime import datetime
 
-                from ..services.stock_service import StockAnalysis
+                from ..services.stock_tracking import StockAnalysis
 
                 analysis = StockAnalysis(
                     symbol=event.symbol,
@@ -69,7 +68,9 @@ class StockPriceEventHandler(EventHandler):
                 )
 
                 # Create price movement alert
-                alert = await self.alert_service.create_price_movement_alert(analysis)
+                alert = await self.notification_service.create_price_movement_alert(
+                    analysis
+                )
 
                 # Trigger alert event
                 from .event_bus import get_event_bus
@@ -150,7 +151,6 @@ class AlertEventHandler(EventHandler):
 
     def __init__(self):
         super().__init__("alert_handler")
-        self.alert_service = AlertService()
         self.notification_service = NotificationService()
 
     async def handle_alert_triggered(self, event: AlertTriggeredEvent):
@@ -173,11 +173,11 @@ class AlertEventHandler(EventHandler):
 
         try:
             # Check if we should send alert today
-            from ..services.alert_service import AlertType
+            from ..services.notification import AlertType
 
             alert_type_enum = AlertType(event.alert_type)
 
-            should_send = await self.alert_service.should_send_alert_today(
+            should_send = await self.notification_service.should_send_alert_today(
                 event.symbol, alert_type_enum
             )
 
@@ -190,7 +190,7 @@ class AlertEventHandler(EventHandler):
                 return
 
             # Create alert object for notification
-            from ..services.alert_service import Alert, AlertSeverity
+            from ..services.notification import Alert, AlertSeverity
 
             alert = Alert(
                 symbol=event.symbol,
@@ -212,7 +212,7 @@ class AlertEventHandler(EventHandler):
             )
 
             # Record alert as sent
-            await self.alert_service.record_alert_sent(alert)
+            await self.notification_service.record_alert_sent(alert)
 
             # Trigger alert sent event
             from .event_bus import get_event_bus

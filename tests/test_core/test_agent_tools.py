@@ -771,7 +771,7 @@ class TestPoliticianTools:
         assert result == expected
 
     @patch("sentinel.core.agent_tools.PoliticianActivityRepository")
-    @patch("sentinel.services.congressional_service.CongressionalService")
+    @patch("sentinel.services.congressional.CongressionalService")
     @patch("sentinel.config.settings.get_settings")
     @pytest.mark.asyncio
     async def test_get_politician_activity_info_impl_success(

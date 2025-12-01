@@ -1,47 +1,20 @@
-"""Stock service for stock-related business operations."""
+"""Stock price operations and analysis."""
 
-from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-from typing import List, Optional
+from typing import List
 
-from ..config.logging import get_logger
-from ..core.stock_query import StockPriceResponse, get_stock_price
-from ..ormdb.database import get_session
-from ..ormdb.repositories import TrackedStockRepository
+from ...config.logging import get_logger
+from ...core.stock_query import StockPriceResponse, get_stock_price
+from .models import MovementThreshold, StockAnalysis
 
 logger = get_logger(__name__)
 
 
-@dataclass
-class StockAnalysis:
-    """Stock analysis data container."""
-
-    symbol: str
-    current_price: float
-    previous_close: float
-    price_change: float
-    price_change_percent: float
-    volume: Optional[int]
-    market_cap: Optional[float]
-    analysis_timestamp: datetime
-    is_significant_movement: bool
-
-
-class MovementThreshold(Enum):
-    """Price movement significance thresholds."""
-
-    MINOR = 0.005  # 0.5%
-    MODERATE = 0.01  # 1%
-    SIGNIFICANT = 0.05  # 5%
-    MAJOR = 0.10  # 10%
-
-
-class StockService:
-    """Service for stock-related business operations."""
+class StockOperations:
+    """Handles stock price fetching and analysis operations."""
 
     def __init__(self):
-        self.logger = logger.bind(service="stock_service")
+        self.logger = logger.bind(component="stock_operations")
 
     async def get_stock_price(self, symbol: str) -> StockPriceResponse:
         """
@@ -115,8 +88,8 @@ class StockService:
             previous_close=stock_data.previous_close,
             price_change=price_change,
             price_change_percent=price_change_percent,
-            volume=stock_data.volume,
-            market_cap=stock_data.market_cap,
+            volume=stock_data.volume,  # type: ignore
+            market_cap=stock_data.market_cap,  # type: ignore
             analysis_timestamp=datetime.utcnow(),
             is_significant_movement=is_significant,
         )
