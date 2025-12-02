@@ -6,7 +6,7 @@ from typing import Dict, List
 from ...config.logging import get_logger
 from ...ormdb.database import get_session
 from ...ormdb.repositories import PoliticianActivityRepository
-from ..congressional import CongressionalService
+from .congressional_operations import CongressionalOperations
 from .models import CongressionalTrackingResult
 
 logger = get_logger(__name__)
@@ -15,8 +15,8 @@ logger = get_logger(__name__)
 class CongressionalTracker:
     """Handles congressional member trade tracking operations."""
 
-    def __init__(self, congressional_service: CongressionalService):
-        self.congressional_service = congressional_service
+    def __init__(self, congressional_operations: CongressionalOperations):
+        self.congressional_operations = congressional_operations
         self.logger = logger.bind(component="congressional_tracker")
 
     async def track_all_members(
@@ -82,12 +82,14 @@ class CongressionalTracker:
         """
         try:
             # Fetch recent trades from API
-            recent_trades = await self.congressional_service.get_congressional_trades(
-                representative=member_name, days_back=days_back, save_to_db=True
+            recent_trades = (
+                await self.congressional_operations.get_congressional_trades(
+                    representative=member_name, days_back=days_back, save_to_db=True
+                )
             )
 
             # Identify notable trades
-            notable_trades = self.congressional_service.get_notable_trades(
+            notable_trades = self.congressional_operations.get_notable_trades(
                 recent_trades
             )
 
@@ -153,7 +155,7 @@ class CongressionalTracker:
         for member_name in member_names:
             try:
                 # Sync trades for this member
-                trades = await self.congressional_service.get_congressional_trades(
+                trades = await self.congressional_operations.get_congressional_trades(
                     representative=member_name, days_back=days_back, save_to_db=True
                 )
                 total_synced += len(trades)

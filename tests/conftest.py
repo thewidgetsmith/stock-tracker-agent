@@ -198,7 +198,7 @@ def mock_telegram_env():
 @pytest.fixture(autouse=True)
 def clean_lru_cache():
     """Clear LRU cache between tests to avoid state pollution."""
-    from src.sentinel.agents.prompts import load_agent_prompts
+    from sentinel.agents.prompts import load_agent_prompts
 
     yield
 

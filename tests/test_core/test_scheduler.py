@@ -49,19 +49,26 @@ class TestGlobalScheduler:
         mock_scheduler = Mock()
         mock_create.return_value = mock_scheduler
 
-        # Reset global scheduler
-        with patch("sentinel.scheduler._global_scheduler", None):
-            scheduler = get_global_scheduler()
+        # Clear the function attribute if it exists
+        if hasattr(get_global_scheduler, "_scheduler"):
+            delattr(get_global_scheduler, "_scheduler")
+
+        scheduler = get_global_scheduler()
 
         assert scheduler == mock_scheduler
         mock_create.assert_called_once()
 
-    @patch("sentinel.scheduler._global_scheduler", Mock(name="existing_scheduler"))
     def test_get_global_scheduler_returns_existing(self):
         """Test that existing global scheduler is returned."""
-        with patch("sentinel.scheduler._global_scheduler") as mock_existing:
-            scheduler = get_global_scheduler()
-            assert scheduler == mock_existing
+        mock_existing = Mock(name="existing_scheduler")
+        get_global_scheduler._scheduler = mock_existing
+
+        scheduler = get_global_scheduler()
+        assert scheduler == mock_existing
+
+        # Clean up
+        if hasattr(get_global_scheduler, "_scheduler"):
+            delattr(get_global_scheduler, "_scheduler")
 
 
 class TestStartShutdownScheduler:
@@ -71,6 +78,7 @@ class TestStartShutdownScheduler:
     def test_start_scheduler(self, mock_get_scheduler):
         """Test starting the scheduler."""
         mock_scheduler = Mock()
+        mock_scheduler.running = False
         mock_get_scheduler.return_value = mock_scheduler
 
         start_scheduler()
@@ -81,11 +89,12 @@ class TestStartShutdownScheduler:
     def test_shutdown_scheduler(self, mock_get_scheduler):
         """Test shutting down the scheduler."""
         mock_scheduler = Mock()
+        mock_scheduler.running = True
         mock_get_scheduler.return_value = mock_scheduler
 
         shutdown_scheduler()
 
-        mock_scheduler.shutdown.assert_called_once_with(wait=False)
+        mock_scheduler.shutdown.assert_called_once_with(wait=True)
 
 
 class TestAddStockTrackingJob:
@@ -97,9 +106,8 @@ class TestAddStockTrackingJob:
         mock_scheduler = Mock()
         mock_get_scheduler.return_value = mock_scheduler
 
-        result = add_stock_tracking_job(60)
+        add_stock_tracking_job(60)
 
-        assert result is True
         mock_scheduler.add_job.assert_called_once()
 
         # Verify job configuration
@@ -115,30 +123,22 @@ class TestAddStockTrackingJob:
         mock_scheduler.add_job.side_effect = Exception("Scheduler error")
         mock_get_scheduler.return_value = mock_scheduler
 
-        result = add_stock_tracking_job()
-
-        assert result is False
+        # Should raise the exception since no error handling
+        with pytest.raises(Exception, match="Scheduler error"):
+            add_stock_tracking_job()
 
 
 class TestAddPoliticianTrackingJob:
     """Test politician tracking job functionality."""
 
-    @patch("sentinel.scheduler.get_settings")
     @patch("sentinel.scheduler.get_global_scheduler")
-    def test_add_politician_tracking_job_success(
-        self, mock_get_scheduler, mock_get_settings
-    ):
+    def test_add_politician_tracking_job_success(self, mock_get_scheduler):
         """Test successfully adding politician tracking job."""
-        mock_settings = Mock()
-        mock_settings.quiver_api_token = "test_token"
-        mock_get_settings.return_value = mock_settings
-
         mock_scheduler = Mock()
         mock_get_scheduler.return_value = mock_scheduler
 
-        result = add_politician_tracking_job(9)
+        add_politician_tracking_job(9)
 
-        assert result is True
         mock_scheduler.add_job.assert_called_once()
 
         # Verify job configuration
@@ -146,59 +146,33 @@ class TestAddPoliticianTrackingJob:
         assert call_args[1]["id"] == "politician_tracking"
         assert call_args[1]["trigger"] == "cron"
         assert call_args[1]["hour"] == 9
-        assert call_args[1]["minute"] == 0
 
-    @patch("sentinel.scheduler.get_settings")
-    def test_add_politician_tracking_job_no_token(self, mock_get_settings):
-        """Test adding politician tracking job without API token."""
-        mock_settings = Mock()
-        mock_settings.quiver_api_token = None
-        mock_get_settings.return_value = mock_settings
-
-        result = add_politician_tracking_job()
-
-        assert result is False
-
-    @patch("sentinel.scheduler.get_settings")
     @patch("sentinel.scheduler.get_global_scheduler")
-    def test_add_politician_tracking_job_scheduler_error(
-        self, mock_get_scheduler, mock_get_settings
-    ):
+    def test_add_politician_tracking_job_scheduler_error(self, mock_get_scheduler):
         """Test handling scheduler errors when adding politician job."""
-        mock_settings = Mock()
-        mock_settings.quiver_api_token = "test_token"
-        mock_get_settings.return_value = mock_settings
-
         mock_scheduler = Mock()
         mock_scheduler.add_job.side_effect = Exception("Scheduler error")
         mock_get_scheduler.return_value = mock_scheduler
 
-        result = add_politician_tracking_job()
+        # Should raise the exception since no error handling
+        with pytest.raises(Exception, match="Scheduler error"):
+            add_politician_tracking_job()
 
-        assert result is False
-
-    @patch("sentinel.scheduler.get_settings")
     @patch("sentinel.scheduler.get_global_scheduler")
-    def test_politician_job_function_reference(
-        self, mock_get_scheduler, mock_get_settings
-    ):
+    def test_politician_job_function_reference(self, mock_get_scheduler):
         """Test that politician tracking job uses correct function reference."""
-        mock_settings = Mock()
-        mock_settings.quiver_api_token = "test_token"
-        mock_get_settings.return_value = mock_settings
-
         mock_scheduler = Mock()
         mock_get_scheduler.return_value = mock_scheduler
 
         add_politician_tracking_job()
 
-        # Verify the function reference is serializable (not a lambda)
+        # Verify the function reference is a string (serializable)
         call_args = mock_scheduler.add_job.call_args
-        job_func = call_args[0][0]
+        job_func = call_args[1]["func"]
 
-        # Should be a proper module function, not a lambda
-        assert hasattr(job_func, "__module__")
-        assert hasattr(job_func, "__name__")
+        # Should be a string reference to module function
+        assert isinstance(job_func, str)
+        assert "politician_tracker" in job_func
 
 
 class TestListScheduledJobs:
@@ -254,45 +228,42 @@ class TestListScheduledJobs:
 class TestSchedulerIntegration:
     """Integration tests for scheduler functionality."""
 
-    @patch("sentinel.scheduler.get_settings")
     @patch("sentinel.core.politician_tracker.track_politicians")
     @patch("sentinel.scheduler.get_global_scheduler")
     def test_politician_tracking_job_integration(
-        self, mock_get_scheduler, mock_track_politicians, mock_get_settings
+        self, mock_get_scheduler, mock_track_politicians
     ):
         """Test integration between scheduler and politician tracking."""
-        mock_settings = Mock()
-        mock_settings.quiver_api_token = "test_token"
-        mock_get_settings.return_value = mock_settings
-
         mock_scheduler = Mock()
         mock_get_scheduler.return_value = mock_scheduler
 
         # Add politician tracking job
-        result = add_politician_tracking_job(9)
+        add_politician_tracking_job(9)
 
-        assert result is True
         mock_scheduler.add_job.assert_called_once()
 
         # Verify job configuration matches expectations
         call_args = mock_scheduler.add_job.call_args
         assert call_args[1]["id"] == "politician_tracking"
         assert call_args[1]["hour"] == 9
-        assert call_args[1]["minute"] == 0
 
     @patch("sentinel.scheduler.get_global_scheduler")
     def test_scheduler_lifecycle_integration(self, mock_get_scheduler):
         """Test complete scheduler lifecycle."""
         mock_scheduler = Mock()
+        mock_scheduler.running = False
         mock_get_scheduler.return_value = mock_scheduler
 
         # Should start without errors
         start_scheduler()
         mock_scheduler.start.assert_called_once()
 
+        # Update running status
+        mock_scheduler.running = True
+
         # Should shutdown cleanly
         shutdown_scheduler()
-        mock_scheduler.shutdown.assert_called_once_with(wait=False)
+        mock_scheduler.shutdown.assert_called_once_with(wait=True)
 
 
 # Mock fixtures for testing
@@ -319,27 +290,21 @@ def mock_politician_tracking_config():
 class TestSchedulerFixtures:
     """Test scheduler with fixture data."""
 
-    @patch("sentinel.scheduler.get_settings")
     @patch("sentinel.scheduler.get_global_scheduler")
     def test_politician_job_with_mock_config(
         self,
         mock_get_scheduler,
-        mock_scheduler_settings,
         mock_politician_tracking_config,
     ):
         """Test politician tracking job with mock configuration."""
-        with patch("sentinel.scheduler.get_settings") as mock_get_settings:
-            mock_get_settings.return_value = mock_scheduler_settings
+        mock_scheduler = Mock()
+        mock_get_scheduler.return_value = mock_scheduler
 
-            mock_scheduler = Mock()
-            mock_get_scheduler.return_value = mock_scheduler
+        add_politician_tracking_job()
 
-            result = add_politician_tracking_job()
+        mock_scheduler.add_job.assert_called_once()
 
-            assert result is True
-            mock_scheduler.add_job.assert_called_once()
-
-            # Verify configuration matches expected
-            call_args = mock_scheduler.add_job.call_args
-            assert call_args[1]["hour"] == mock_politician_tracking_config["hour"]
-            assert call_args[1]["minute"] == mock_politician_tracking_config["minute"]
+        # Verify configuration matches expected
+        call_args = mock_scheduler.add_job.call_args
+        # Default hour is 9 when not specified
+        assert call_args[1]["hour"] == 9

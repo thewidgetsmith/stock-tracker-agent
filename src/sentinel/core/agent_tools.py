@@ -82,11 +82,11 @@ async def get_politician_activity_info_impl(
         try:
             # Import here to avoid circular imports
             from ..config.settings import get_settings
-            from ..services.congressional import CongressionalService
+            from ..services.congressional_tracking import CongressionalTrackingService
 
             settings = get_settings()
             if hasattr(settings, "quiver_api_token") and settings.quiver_api_token:
-                service = CongressionalService(settings.quiver_api_token)
+                service = CongressionalTrackingService(settings.quiver_api_token)
                 trades = await service.get_congressional_trades(
                     representative=name, days_back=30, save_to_db=True
                 )

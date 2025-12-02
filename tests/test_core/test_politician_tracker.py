@@ -87,7 +87,7 @@ class TestGetTrackedPoliticians:
 class TestFetchPoliticianTrades:
     """Test fetching politician trades from Quiver API."""
 
-    @patch("sentinel.core.politician_tracker.CongressionalService")
+    @patch("sentinel.core.politician_tracker.CongressionalTrackingService")
     @patch("sentinel.core.politician_tracker.get_settings")
     @pytest.mark.asyncio
     async def test_fetch_politician_trades_success(
@@ -131,7 +131,7 @@ class TestFetchPoliticianTrades:
 
         assert result is False
 
-    @patch("sentinel.core.politician_tracker.CongressionalService")
+    @patch("sentinel.core.politician_tracker.CongressionalTrackingService")
     @patch("sentinel.core.politician_tracker.get_settings")
     @pytest.mark.asyncio
     async def test_fetch_politician_trades_no_trades_found(
@@ -150,7 +150,7 @@ class TestFetchPoliticianTrades:
 
         assert result is False
 
-    @patch("sentinel.core.politician_tracker.CongressionalService")
+    @patch("sentinel.core.politician_tracker.CongressionalTrackingService")
     @patch("sentinel.core.politician_tracker.get_settings")
     @pytest.mark.asyncio
     async def test_fetch_politician_trades_api_error(

@@ -770,9 +770,9 @@ class TestPoliticianTools:
         expected = []
         assert result == expected
 
-    @patch("sentinel.core.agent_tools.PoliticianActivityRepository")
-    @patch("sentinel.services.congressional.CongressionalService")
     @patch("sentinel.config.settings.get_settings")
+    @patch("sentinel.core.agent_tools.PoliticianActivityRepository")
+    @patch("sentinel.services.congressional_tracking.CongressionalTrackingService")
     @pytest.mark.asyncio
     async def test_get_politician_activity_info_impl_success(
         self, mock_get_settings, mock_service_class, mock_repo_class
@@ -804,11 +804,17 @@ class TestPoliticianTools:
         # Should return list of strings
         assert isinstance(result, list)
 
+    @patch("sentinel.scheduler.trigger_politician_research_job")
+    @patch("sentinel.core.agent_tools.PoliticianProfileRepository")
     @patch("sentinel.core.agent_tools.PoliticianActivityRepository")
     @patch("sentinel.config.settings.get_settings")
     @pytest.mark.asyncio
     async def test_get_politician_activity_info_impl_no_token(
-        self, mock_get_settings, mock_repo_class
+        self,
+        mock_get_settings,
+        mock_activity_repo_class,
+        mock_profile_repo_class,
+        mock_trigger_research,
     ):
         """Test checking politician activity without API token."""
         from sentinel.core.agent_tools import get_politician_activity_info_impl
@@ -817,22 +823,43 @@ class TestPoliticianTools:
         mock_settings.quiver_api_token = None
         mock_get_settings.return_value = mock_settings
 
+        # Mock profile repository for staleness check
+        mock_profile_repo = Mock()
+        mock_profile_repo.is_data_stale.return_value = False
+        mock_profile_repo_class.return_value.__enter__.return_value = mock_profile_repo
+
         # Mock empty activities from repository
-        mock_repo = Mock()
-        mock_repo.get_activities_by_politician.return_value = []
-        mock_repo_class.return_value.__enter__.return_value = mock_repo
+        mock_activity_repo = Mock()
+        mock_activity_repo.get_activities_by_politician.return_value = []
+        mock_activity_repo_class.return_value.__enter__.return_value = (
+            mock_activity_repo
+        )
+
+        # Mock research job trigger
+        mock_trigger_research.return_value = "Research job triggered"
 
         result = await get_politician_activity_info_impl("Nancy Pelosi")
 
-        # Should return "No trading activity found" message
+        # Should return "No trading activity found" message with research trigger notice
         assert isinstance(result, list)
-        assert result == ["No trading activity found for Nancy Pelosi"]
+        assert result == [
+            "No trading activity found for Nancy Pelosi. Research job has been triggered to gather data."
+        ]
 
+        # Verify research job was triggered
+        mock_trigger_research.assert_called_once_with("Nancy Pelosi")
+
+    @patch("sentinel.scheduler.trigger_politician_research_job")
+    @patch("sentinel.core.agent_tools.PoliticianProfileRepository")
     @patch("sentinel.core.agent_tools.PoliticianActivityRepository")
     @patch("sentinel.config.settings.get_settings")
     @pytest.mark.asyncio
     async def test_get_politician_activity_info_impl_no_activities(
-        self, mock_get_settings, mock_repo_class
+        self,
+        mock_get_settings,
+        mock_activity_repo_class,
+        mock_profile_repo_class,
+        mock_trigger_research,
     ):
         """Test checking politician activity when no activities found."""
         from sentinel.core.agent_tools import get_politician_activity_info_impl
@@ -841,17 +868,33 @@ class TestPoliticianTools:
         mock_settings.quiver_api_token = "test_token"
         mock_get_settings.return_value = mock_settings
 
-        mock_repo = Mock()
-        mock_repo.get_activities_by_politician.return_value = []
-        mock_repo_class.return_value.__enter__.return_value = mock_repo
+        # Mock profile repository for staleness check
+        mock_profile_repo = Mock()
+        mock_profile_repo.is_data_stale.return_value = False
+        mock_profile_repo_class.return_value.__enter__.return_value = mock_profile_repo
+
+        # Mock empty activities from repository
+        mock_activity_repo = Mock()
+        mock_activity_repo.get_activities_by_politician.return_value = []
+        mock_activity_repo_class.return_value.__enter__.return_value = (
+            mock_activity_repo
+        )
+
+        # Mock research job trigger
+        mock_trigger_research.return_value = "Research job triggered"
 
         result = await get_politician_activity_info_impl(
             "Nancy Pelosi", fetch_latest=False
         )
 
-        # Should return "No trading activity found" message
+        # Should return "No trading activity found" message with research trigger notice
         assert isinstance(result, list)
-        assert result == ["No trading activity found for Nancy Pelosi"]
+        assert result == [
+            "No trading activity found for Nancy Pelosi. Research job has been triggered to gather data."
+        ]
+
+        # Verify research job was triggered
+        mock_trigger_research.assert_called_once_with("Nancy Pelosi")
 
     @pytest.mark.asyncio
     async def test_add_politician_to_tracker_wrapper(self):

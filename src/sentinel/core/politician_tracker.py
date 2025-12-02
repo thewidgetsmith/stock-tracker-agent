@@ -11,7 +11,7 @@ from ..ormdb.repositories import (
     PoliticianActivityRepository,
     TrackedPoliticianRepository,
 )
-from ..services.congressional import CongressionalService
+from ..services.congressional_tracking import CongressionalTrackingService
 
 logger = get_logger(__name__)
 
@@ -47,7 +47,7 @@ async def fetch_politician_trades(politician_name: str) -> bool:
 
     try:
         logger.info(f"Fetching trades for {politician_name}")
-        service = CongressionalService(settings.quiver_api_token)
+        service = CongressionalTrackingService(settings.quiver_api_token)
 
         # Fetch trades from the last 7 days to catch recent activity
         trades = await service.get_congressional_trades(
@@ -167,15 +167,16 @@ def run_politician_tracking_sync():
     """
     import asyncio
 
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         # Run the async function in a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         loop.run_until_complete(track_politicians())
-        loop.close()
         logger.info("Politician tracking job completed successfully")
     except Exception as e:
         logger.error(f"Error in politician tracking job: {e}")
+    finally:
+        loop.close()
 
 
 def run_politician_research_sync(politician_name: str):
@@ -186,11 +187,9 @@ def run_politician_research_sync(politician_name: str):
     """
     import asyncio
 
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        # Run the async research pipeline
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         # Fetch latest trades first
         loop.run_until_complete(fetch_politician_trades(politician_name))
 
@@ -200,9 +199,10 @@ def run_politician_research_sync(politician_name: str):
         # Mark activities as analyzed
         loop.run_until_complete(mark_activities_analyzed(politician_name))
 
-        loop.close()
         logger.info(
             f"Politician research job for {politician_name} completed successfully"
         )
     except Exception as e:
         logger.error(f"Error in politician research job for {politician_name}: {e}")
+    finally:
+        loop.close()

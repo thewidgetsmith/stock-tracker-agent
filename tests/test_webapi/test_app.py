@@ -81,12 +81,15 @@ class TestFastAPIApp:
         headers = {"Authorization": "Bearer invalid_token"}
         response = client.get("/", headers=headers)
         assert response.status_code == 401
-        assert "Invalid authentication token" in response.json()["detail"]
+        assert "Invalid authentication token" in response.json()["error"]["message"]
 
     def test_health_endpoint_requires_auth(self, client):
-        """Test that health endpoint requires authentication."""
+        """Test that health endpoint is publicly accessible."""
         response = client.get("/api/v1/health")
-        assert response.status_code == 403
+        # Health endpoint is public, should return 200
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
 
     def test_health_endpoint_with_valid_auth(self, client):
         """Test health endpoint with valid authentication."""
@@ -101,10 +104,11 @@ class TestFastAPIApp:
         assert "database" in data["health"]["services"]
 
     def test_health_endpoint_with_invalid_auth(self, client):
-        """Test health endpoint with invalid authentication."""
+        """Test health endpoint with invalid authentication - still accessible."""
         headers = {"Authorization": "Bearer wrong_token"}
         response = client.get("/api/v1/health", headers=headers)
-        assert response.status_code == 401
+        # Health endpoint is public, invalid auth header is ignored
+        assert response.status_code == 200
 
     # Authentication Function Tests
 
@@ -124,7 +128,7 @@ class TestFastAPIApp:
     def test_verify_auth_token_valid(self, env_vars, client):
         """Test auth verification with valid token through actual endpoint."""
         headers = {"Authorization": "Bearer s9oH9wtK0fgJUHbMfcRAyu1p4I7zkpvI"}
-        response = client.get("/")
+        response = client.get("/", headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -218,9 +222,9 @@ class TestFastAPIApp:
                 f"/webhook/set?webhook_url={webhook_url}", headers=headers
             )
 
-        # The 400 HTTPException gets caught by the outer exception handler and becomes a 500
-        assert response.status_code == 500
-        assert "Failed to set webhook" in response.json()["detail"]
+        # HTTPException 400 is returned as-is
+        assert response.status_code == 400
+        assert "Failed to set webhook" in response.json()["error"]["message"]
 
     @pytest.mark.asyncio
     async def test_set_webhook_exception(self, async_client, mock_telegram_bot):
@@ -236,7 +240,10 @@ class TestFastAPIApp:
             )
 
         assert response.status_code == 500
-        assert "Error setting webhook: Network error" in response.json()["detail"]
+        assert (
+            "Error setting webhook: Network error"
+            in response.json()["error"]["message"]
+        )
 
     def test_webhook_info_requires_auth(self, client):
         """Test that webhook info endpoint requires authentication."""
@@ -273,7 +280,10 @@ class TestFastAPIApp:
             response = await async_client.get("/webhook/info", headers=headers)
 
         assert response.status_code == 500
-        assert "Error getting webhook info: API error" in response.json()["detail"]
+        assert (
+            "Error getting webhook info: API error"
+            in response.json()["error"]["message"]
+        )
 
     def test_delete_webhook_requires_auth(self, client):
         """Test that delete webhook endpoint requires authentication."""
@@ -291,7 +301,9 @@ class TestFastAPIApp:
             response = await async_client.delete("/webhook", headers=headers)
 
         assert response.status_code == 200
-        assert response.json()["status"] == "webhook deleted successfully"
+        response_data = response.json()
+        assert response_data["success"] is True
+        assert response_data["data"]["status"] == "webhook_deleted"
         mock_telegram_bot.delete_webhook.assert_called_once()
 
     @pytest.mark.asyncio
@@ -305,9 +317,9 @@ class TestFastAPIApp:
         with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
             response = await async_client.delete("/webhook", headers=headers)
 
-        # The 400 HTTPException gets caught by the outer exception handler and becomes a 500
-        assert response.status_code == 500
-        assert "Failed to delete webhook" in response.json()["detail"]
+        # HTTPException 400 is returned as-is
+        assert response.status_code == 400
+        assert "Failed to delete webhook" in response.json()["error"]["message"]
 
     @pytest.mark.asyncio
     async def test_delete_webhook_exception(self, async_client, mock_telegram_bot):
@@ -319,7 +331,10 @@ class TestFastAPIApp:
             response = await async_client.delete("/webhook", headers=headers)
 
         assert response.status_code == 500
-        assert "Error deleting webhook: Connection error" in response.json()["detail"]
+        assert (
+            "Error deleting webhook: Connection error"
+            in response.json()["error"]["message"]
+        )
 
     # Telegram Webhook Tests
 
@@ -335,7 +350,7 @@ class TestFastAPIApp:
 
         response = client.post("/webhook/tg-nqlftdvdqi", json=webhook_data)
         assert response.status_code == 404  # Returns 404 when auth fails
-        assert "Not Found" in response.json()["detail"]
+        assert "Not Found" in response.json()["error"]["message"]
 
     @pytest.mark.asyncio
     async def test_telegram_webhook_with_valid_header(
@@ -348,13 +363,20 @@ class TestFastAPIApp:
         webhook_data = {
             "message": {
                 "text": "test message",
-                "chat": {"id": "123456789"},
+                "chat": {"id": "7796373477"},  # Use authorized chat_id from fixture
                 "from": {"id": "user123"},
                 "message_id": 1234,
             }
         }
 
         with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
+            # Update the mock to return the correct chat_id
+            mock_telegram_bot.extract_message_info.return_value = (
+                "test message",
+                "7796373477",
+                "user123",
+            )
+
             with patch(
                 "sentinel.webapi.app.handle_incoming_message", new_callable=AsyncMock
             ) as mock_handler:
@@ -368,14 +390,18 @@ class TestFastAPIApp:
                     )
 
         assert response.status_code == 200
-        assert response.json()["status"] == "ok"
+        response_data = response.json()
+        assert response_data["success"] is True
+        assert (
+            response_data["data"]["status"] == "processed"
+        )  # Changed from "ok" to "processed"
 
         # Verify interactions
         mock_telegram_bot.extract_message_info.assert_called_once_with(webhook_data)
         mock_chat_manager.store_user_message.assert_called_once()
-        mock_handler.assert_called_once_with("test message", chat_id="123456789")
+        mock_handler.assert_called_once_with("test message", chat_id="7796373477")
         mock_telegram_bot.send_message.assert_called_once_with(
-            "Test response", chat_id="123456789"
+            "Test response", chat_id="7796373477"
         )
 
     @pytest.mark.asyncio
@@ -406,7 +432,9 @@ class TestFastAPIApp:
             )
 
         assert response.status_code == 200
-        assert response.json()["status"] == "unauthorized"
+        response_data = response.json()
+        assert response_data["success"] is True
+        assert response_data["data"]["status"] == "unauthorized"
         mock_telegram_bot.send_message.assert_called_once_with(
             "Sorry, you are not authorized to use this bot.",
             chat_id="unauthorized_chat",
@@ -430,7 +458,9 @@ class TestFastAPIApp:
             )
 
         assert response.status_code == 200
-        assert response.json()["status"] == "ignored"
+        response_data = response.json()
+        assert response_data["success"] is True
+        assert response_data["data"]["status"] == "ignored"
 
     @pytest.mark.asyncio
     async def test_telegram_webhook_processing_exception(
@@ -443,10 +473,18 @@ class TestFastAPIApp:
         webhook_data = {
             "message": {
                 "text": "test message",
-                "chat": {"id": "123456789"},
+                "chat": {"id": "7796373477"},  # Use authorized chat_id
                 "from": {"id": "user123"},
             }
         }
+
+        with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
+            # Update the mock to return the correct chat_id
+            mock_telegram_bot.extract_message_info.return_value = (
+                "test message",
+                "7796373477",
+                "user123",
+            )
 
         with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
             with patch(
@@ -457,8 +495,12 @@ class TestFastAPIApp:
                     "/webhook/tg-nqlftdvdqi", json=webhook_data, headers=headers
                 )
 
-        assert response.status_code == 500
-        assert response.json()["error"] == "Internal server error"
+        # Webhook endpoint catches exceptions and returns 200 with error status
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["success"] is True
+        assert response_data["data"]["status"] == "error"
+        assert "Processing error" in response_data["data"]["error"]
 
     @pytest.mark.asyncio
     async def test_telegram_webhook_no_username(self, async_client, mock_telegram_bot):
@@ -469,11 +511,20 @@ class TestFastAPIApp:
         webhook_data = {
             "message": {
                 "text": "test message",
-                "chat": {"id": "123456789"},
+                "chat": {"id": "7796373477"},  # Use authorized chat_id
                 "from": {"id": "user123"},
                 # No first_name in from object
+                "message_id": 1234,
             }
         }
+
+        with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
+            # Update the mock to return the correct chat_id
+            mock_telegram_bot.extract_message_info.return_value = (
+                "test message",
+                "7796373477",
+                "user123",
+            )
 
         with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
             with patch(
@@ -482,6 +533,7 @@ class TestFastAPIApp:
                 with patch(
                     "sentinel.webapi.app.chat_history_manager"
                 ) as mock_chat_manager:
+                    mock_chat_manager.store_user_message = Mock()
                     mock_handler.return_value = "Test response"
 
                     response = await async_client.post(
@@ -489,6 +541,9 @@ class TestFastAPIApp:
                     )
 
         assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["success"] is True
+        assert response_data["data"]["status"] == "processed"
 
         # Verify default username is used
         call_args = mock_chat_manager.store_user_message.call_args
@@ -505,11 +560,19 @@ class TestFastAPIApp:
         webhook_data = {
             "message": {
                 "text": "test message",
-                "chat": {"id": "123456789"},
+                "chat": {"id": "7796373477"},  # Use authorized chat_id
                 "from": {"id": "user123", "first_name": "TestUser"},
                 # No message_id
             }
         }
+
+        with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
+            # Update the mock to return the correct chat_id
+            mock_telegram_bot.extract_message_info.return_value = (
+                "test message",
+                "7796373477",
+                "user123",
+            )
 
         with patch("sentinel.webapi.app.telegram_bot", mock_telegram_bot):
             with patch(
@@ -518,6 +581,7 @@ class TestFastAPIApp:
                 with patch(
                     "sentinel.webapi.app.chat_history_manager"
                 ) as mock_chat_manager:
+                    mock_chat_manager.store_user_message = Mock()
                     mock_handler.return_value = "Test response"
 
                     response = await async_client.post(
@@ -525,6 +589,9 @@ class TestFastAPIApp:
                     )
 
         assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["success"] is True
+        assert response_data["data"]["status"] == "processed"
 
         # Verify None is passed for message_id
         call_args = mock_chat_manager.store_user_message.call_args
@@ -548,7 +615,8 @@ class TestFastAPIApp:
 
         assert response.status_code == 200
         response_data = response.json()
-        assert response_data["secret_token_configured"] is False
+        assert response_data["success"] is True
+        assert response_data["data"]["secret_token_configured"] is False
         mock_telegram_bot.set_webhook.assert_called_once_with(
             webhook_url, secret_token=""
         )

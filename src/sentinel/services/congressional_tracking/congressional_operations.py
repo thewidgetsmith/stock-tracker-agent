@@ -1,4 +1,4 @@
-"""Main congressional trading service."""
+"""Core congressional trading operations."""
 
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -12,12 +12,12 @@ from .models import CongressionalActivity, CongressionalBranch, CongressionalTra
 logger = get_logger(__name__)
 
 
-class CongressionalService:
-    """Service for congressional trading operations."""
+class CongressionalOperations:
+    """Core operations for congressional trading data fetching and analysis."""
 
     def __init__(self, api_token: str):
         """
-        Initialize congressional service with Quiver API token.
+        Initialize congressional operations with Quiver API token.
 
         Args:
             api_token: Quiver Quantitative API token
@@ -26,7 +26,7 @@ class CongressionalService:
         self.api_client = QuiverAPIClient(api_token)
         self.data_processor = CongressionalDataProcessor()
         self.database = CongressionalDatabase()
-        self.logger = logger.bind(service="congressional_service")
+        self.logger = logger.bind(component="congressional_operations")
 
     async def get_congressional_trades(
         self,
